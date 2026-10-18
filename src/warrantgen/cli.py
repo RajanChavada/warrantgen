@@ -1,4 +1,4 @@
-"""warrantgen command line: inspect inferred rules, or write one step as a tenuo-cli template."""
+"""warrantgen: infer Tenuo warrants from recorded tool calls, then write templates, delegation chains or tests."""
 import argparse
 import json
 import sys
