@@ -15,10 +15,16 @@ def exact(value):
     return Range(min=value, max=value) if isinstance(value, (int, float)) else Exact(value)
 
 
-def under(paths):
+def under(paths, within=None):
+    """Paths under these folders, never a secret, never `..`. `within` is a parent hop's folders: Tenuo only
+    narrows an All by adding parts, so the child keeps the parent's parts and adds its own folder rule."""
+    base = [Regex(_folders(within or paths)), Not(Regex(SECRET)), Not(Regex(PARENT))]
+    return All(base + [Regex(_folders(paths))] if within else base)
+
+
+def _folders(paths):
     dirs = sorted({p.split("/")[0] for p in paths})
-    prefix = r"^(" + "|".join(re.escape(d) for d in dirs) + rf")(/{SAFE_CHARS}*)?$"
-    return All([Regex(prefix), Not(Regex(SECRET)), Not(Regex(PARENT))])
+    return r"^(" + "|".join(re.escape(d) for d in dirs) + rf")(/{SAFE_CHARS}*)?$"
 
 
 def constraint(rule, binding=None):

@@ -49,3 +49,8 @@ that stops injected reads.
 - Read tools are recognized by name prefix (`read`, `list`, `get`, `fetch`, `search`, `view`); paths by argument name.
 - Folder rules take their folders from the run's own calls; a real minter takes them from run settings.
 - Fixed: `warrantgen.mint` was both a function and a module (renamed the module to `minting`).
+- A parent hop that fetches from several hosts gets an exact per-run URL list, not one URL rule per host, so its
+  children can't narrow to their own host (Tenuo refuses one-of to `UrlPattern`). `AnyOf` of per-host
+  `UrlPattern`s would fix it; not done yet.
+- Tenuo narrows an `All` only by adding parts ("child All must include all parent constraints"), so a child's
+  folder rule is the parent's `All` plus one more folder regex. Works, but the child's constraint grows per hop.

@@ -42,3 +42,17 @@ def test_template_refuses_with_reasons(tmp_path, capsys):
     assert main(["template", trace_file(tmp_path), "--step", "poll"]) == 2  # per-run values not given
     assert "get_pr_state.repo" in capsys.readouterr().err
     assert main(["template", trace_file(tmp_path), "--step", "nope"]) == 2
+
+
+def test_chain_prints_hops_and_mints_them(tmp_path, capsys):
+    rows = [{"run": run, "step": step, "tool": tool, "args": args}
+            for run, path in (("r1", "out/a.md"), ("r2", "out/b.md"))
+            for step, tool, args in (("team/researcher", "search", {"query": "a b"}),
+                                     ("writer", "write_file", {"path": path}))]
+    path = tmp_path / "t.jsonl"
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    assert main(["chain", str(path)]) == 0
+    out = capsys.readouterr().out
+    assert "(root): search, write_file\n  team: search\n    team/researcher: search\n  writer: write_file" in out
+    assert main(["chain", str(path), "--from-run", "r1"]) == 0
+    assert "minted 4 hops" in capsys.readouterr().out

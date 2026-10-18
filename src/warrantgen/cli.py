@@ -4,6 +4,7 @@ import json
 import sys
 from pathlib import Path
 
+from warrantgen.chain import hop_rules, hop_values, mint_chains
 from warrantgen.emit import Unsupported, dump, template
 from warrantgen.infer import bound_only, infer, load_trace, run_values
 
@@ -12,13 +13,15 @@ def main(argv=None):
     parser = argparse.ArgumentParser(prog="warrantgen", description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     for name, help_text in (("infer", "show the rules inferred for each step"),
-                            ("template", "write one step as a tenuo-cli template (version 2)")):
+                            ("template", "write one step as a tenuo-cli template (version 2)"),
+                            ("chain", "show the per-hop delegation tree and check each hop narrows")):
         sub = commands.add_parser(name, help=help_text)
         sub.add_argument("traces", nargs="+", help="trace files (JSON lines)")
         sub.add_argument("--var", action="append", default=[], help="treat this argument as a per-run value")
         sub.add_argument("--exact", action="append", default=[], help="pin this argument to its observed value")
         sub.add_argument("--headroom", default="1", help="scale range maxima before rounding up, or 'none'")
     commands.choices["infer"].add_argument("--json", action="store_true", help="print rules as JSON")
+    commands.choices["chain"].add_argument("--from-run", help="mint every hop with this run's values")
     tpl = commands.choices["template"]
     tpl.add_argument("--step", required=True, help="step name, or a unique prefix of it")
     tpl.add_argument("--from-run", help="fill per-run values from this recorded run")
@@ -33,6 +36,8 @@ def main(argv=None):
     steps, excluded = infer(records, variables=args.var, exact=args.exact, headroom=headroom)
     if args.command == "infer":
         return _show(steps, excluded, args.json)
+    if args.command == "chain":
+        return _chain(records, args, excluded)
     return _template(steps, records, args)
 
 
@@ -63,6 +68,29 @@ def _describe(rule):
         return f"under {', '.join(v)}"
     text = f"{rule.kind} {v!r}"
     return text if len(text) <= 44 else text[:41] + "..."
+
+
+def _chain(records, args, excluded):
+    hops = hop_rules([r for r in records if r["run"] not in excluded], variables=args.var, exact=args.exact,
+                     headroom=None if args.headroom == "none" else float(args.headroom))
+    for hop in sorted(hops, key=lambda h: (h.split("/"), h)):
+        depth = hop.count("/") + 1 if hop else 0
+        print(f"{'  ' * depth}{hop or '(root)'}: {', '.join(sorted(hops[hop]))}")
+    if not args.from_run:
+        print("pass --from-run RUN to mint every hop and let Tenuo check that each one narrows")
+        return 0
+    run = [r for r in records if r["run"] == args.from_run]
+    if not run:
+        print(f"--from-run {args.from_run!r} is not in the traces", file=sys.stderr)
+        return 2
+    from tenuo import SigningKey  # throwaway keys: this checks the chain, it doesn't hand one out
+
+    keys = {hop: SigningKey.generate() for hop in hops}
+    chains, notes = mint_chains(hops, SigningKey.generate(), keys, ttl=300, values=hop_values(hops, run))
+    print(f"minted {len(chains)} hops; Tenuo accepted every delegation")
+    for note in notes:
+        print(f"  {note}")
+    return 0
 
 
 def _template(steps, records, args):
