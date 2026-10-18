@@ -33,8 +33,8 @@ that stops injected reads.
 | # | Issue | PR | Status |
 |---|---|---|---|
 | C1 | Issuer and approver keys readable by the agent's user; `init --dev` put them in the project | #942 | fixed in `cb440d2` (`~/.tenuo` default, docs); isolation left to the user, by design |
-| C2 | `warrant reissue` brings back a revoked warrant | #944 | open, reproduced |
-| C3 | `--holder some.pub` resolves from the template's folder, not the current directory | #944 | open, reproduced by review agent |
+| C2 | `warrant reissue` brings back a revoked warrant | #944 | reported ([comment](https://github.com/tenuo-ai/tenuo/pull/944#issuecomment-6244548322)), reproduced at `088adb07` and `cb440d2` |
+| C3 | `--holder some.pub` resolves from the template's folder, not the current directory | #944 | reported (same comment), reproduced at `088adb07` and `cb440d2` |
 | C4 | Approval gates needing 2+ approvers can never pass | #945 | open, traced |
 | C5 | `audit verify` accepts receipts the agent forged (signed with its own key) | #950 | open, traced |
 | C6 | Agent can write its own warrant file and `receipts.jsonl` (same user, 0600) | #950 | open; probe candidate |
