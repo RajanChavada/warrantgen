@@ -55,7 +55,7 @@ def _value(rule, binding):
     if kind == "range":
         low, high = value
         return f"{low}..{high}"
-    if kind in ("pattern", "subpath"):
+    if kind in ("pattern", "subpath", "url_pattern"):
         return {kind: value}
     if kind == "wildcard":
         return "any"

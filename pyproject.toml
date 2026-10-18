@@ -5,8 +5,11 @@ description = "Infer least-privilege Tenuo warrants from recorded agent tool cal
 requires-python = ">=3.10"
 dependencies = ["tenuo==0.3.2"]
 
+[project.optional-dependencies]
+langchain = ["langchain-core>=0.3", "langgraph>=0.3"]
+
 [dependency-groups]
-dev = ["pytest"]
+dev = ["pytest", "langchain-core>=0.3", "langgraph>=0.3"]
 
 [build-system]
 requires = ["hatchling"]

@@ -21,13 +21,14 @@ FREE_TEXT_LEN = 80  # longer strings, or any with whitespace, are free text: ide
 MIN_PREFIX = 3
 READ_VERBS = ("read", "list", "get", "fetch", "search", "view")
 PATH_ARGS = ("path", "dir", "file", "folder")
+URL = re.compile(r"https?://[^/\s]+/")  # scheme, host and the slash after it
 # Money-like arguments get no headroom: extra room on an amount is real exposure.
 MONEY = re.compile(r"(?i)amount|price|cost|cents|fee|total|balance|payment|charge|refund|budget")
 
 
 @dataclass(frozen=True)
 class Rule:
-    """How one argument is constrained. kind: exact, var, oneof, subset, range, pattern, subpath, under, wildcard.
+    """How one argument is constrained. kind: exact, var, oneof, subset, range, pattern, url_pattern, subpath, under, wildcard.
 
     var: the value is fixed within a run but differs between runs, so it becomes a mint-time
     parameter. `value` then says whether that parameter is one value ("exact"), a list ("oneof"),
@@ -92,6 +93,11 @@ def _rule(tool, arg, by_run, force_var, force_exact, headroom):
         if len(by_run) > 1 and any(d != dirs[0] for d in dirs):
             return Rule("var", "under", note="differs per run; " + note)
         return Rule("under", sorted(dirs[0]), note=note)
+    # Pages a read tool fetches are chosen while it runs, so they generalize to a URL prefix on one host.
+    if not force_exact and tool.startswith(READ_VERBS) and all(isinstance(v, str) and URL.match(v) for v in values):
+        prefix = _prefix(values)
+        if URL.match(prefix):
+            return Rule("url_pattern", prefix + "*", note="pages under this URL prefix; resolves '..' and encodings")
     if force_exact or (len(distinct) == 1 and not force_var):
         if len(distinct) > 1:
             return Rule("oneof", sorted(distinct, key=str), note="forced exact but several values seen")

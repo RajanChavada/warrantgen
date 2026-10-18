@@ -24,7 +24,8 @@ that stops injected reads.
 |---|---|---|---|---|
 | S1 | `Exact` accepts strings only | `TypeError: 'int' object is not an instance of 'str'` minting a PR number | Pinned numbers mint as `Range(n, n)`, as seo-agent's `phases.py` does | worked around |
 | S2 | Signed receipts carry tool and request hash, not arguments | `verify_receipt(...).action == "get_order"`, no args field | Drift from receipts is tool-level only; argument drift needs the plaintext trace | by design (privacy) |
-| S3 | LangChain and LangGraph have no observe or dry-run hook; Temporal has `audit_callback` and `dry_run` | `grep dry_run tenuo/langchain.py` is empty | LangChain recorder must use LangChain callbacks | open |
+| S3 | LangChain and LangGraph have no structured observe hook; Temporal has `audit_callback` and `dry_run`. `auto_protect(mode="audit")` logs without arguments, and `TenuoTool` reports decisions only once a warrant exists | `tenuo/langchain.py` | `record_langchain.Recorder` records through LangChain callbacks instead | worked around |
+| S5 | `Pattern` on URLs matches raw text: `https://docs.python.org/3/library/../../internal` passes `Pattern(".../3/library/*")` | Allowed in a test against the real authorizer; `UrlPattern` denies it, plus `%2e%2e` and `host@evil.com` | URL rules mint `UrlPattern` | by design (docs say pattern does not normalize); worked around |
 | S4 | Approvals are reusable until they expire | `docs/local-cli.md`; d8joseph: "keeping track of use makes us stateful" | Generated warrants should pair approval gates with an idempotency key argument | by design |
 
 ## tenuo-cli (local-cli stack)
