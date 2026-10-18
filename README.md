@@ -10,7 +10,7 @@ agent's held-out runs it allows every legitimate call and denies every injected 
 ## How it works
 
 ```mermaid
-flowchart LR
+flowchart TD
     A["Your agent<br/>LangGraph or Temporal"] -- "Recorder<br/>(no warrant needed)" --> T[("traces.jsonl")]
     T --> Q{"Quarantine runs that touched<br/>.env · .. · keys · metadata IPs"}
     Q -- "clean runs" --> I["infer<br/>rules per step"]
@@ -56,8 +56,8 @@ flowchart TD
     R --> T["team<br/>search · fetch"]
     T --> S["team/researcher<br/>search · fetch under docs.python.org/3/library/"]
     R --> W["writer<br/>write_file: this run's report only"]
-    S -. "denied: write_file" .-> X(("✕"))
-    W -. "denied: fetch" .-> X
+    S -. "write_file: denied" .-x W
+    W -. "fetch: denied" .-x S
 ```
 
 Tested under real `TenuoTool` enforcement with full chains: each sub-agent runs its recorded calls, and none can use a
