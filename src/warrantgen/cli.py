@@ -1,0 +1,109 @@
+"""warrantgen command line: inspect inferred rules, or write one step as a tenuo-cli template."""
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from warrantgen.emit import Unsupported, dump, template
+from warrantgen.infer import bound_only, infer, load_trace, run_values
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(prog="warrantgen", description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    for name, help_text in (("infer", "show the rules inferred for each step"),
+                            ("template", "write one step as a tenuo-cli template (version 2)")):
+        sub = commands.add_parser(name, help=help_text)
+        sub.add_argument("traces", nargs="+", help="trace files (JSON lines)")
+        sub.add_argument("--var", action="append", default=[], help="treat this argument as a per-run value")
+        sub.add_argument("--exact", action="append", default=[], help="pin this argument to its observed value")
+        sub.add_argument("--headroom", default="1", help="scale range maxima before rounding up, or 'none'")
+    commands.choices["infer"].add_argument("--json", action="store_true", help="print rules as JSON")
+    tpl = commands.choices["template"]
+    tpl.add_argument("--step", required=True, help="step name, or a unique prefix of it")
+    tpl.add_argument("--from-run", help="fill per-run values from this recorded run")
+    tpl.add_argument("--set", action="append", default=[], metavar="NAME=VALUE",
+                     help="per-run value; commas make a list (repeatable)")
+    tpl.add_argument("--ttl", default="5m")
+    tpl.add_argument("--out", help="write here instead of stdout")
+    args = parser.parse_args(argv)
+
+    records = [r for path in args.traces for r in load_trace(path)]
+    headroom = None if args.headroom == "none" else float(args.headroom)
+    steps, excluded = infer(records, variables=args.var, exact=args.exact, headroom=headroom)
+    if args.command == "infer":
+        return _show(steps, excluded, args.json)
+    return _template(steps, records, args)
+
+
+def _show(steps, excluded, as_json):
+    if as_json:
+        print(json.dumps({"steps": {s: {t: {a: r.__dict__ for a, r in args.items()} for t, args in tools.items()}
+                                    for s, tools in steps.items()}, "quarantined": excluded}, indent=2, default=str))
+        return 0
+    for step, tools in steps.items():
+        print(f"step {step}")
+        for tool, args in tools.items():
+            for arg, rule in args.items():
+                print(f"  {tool + '.' + arg:28} {_describe(rule):44} {rule.note}")
+    for run, reasons in excluded.items():
+        print(f"quarantined run {run}: {'; '.join(reasons)}")
+    return 0
+
+
+def _describe(rule):
+    v = rule.value
+    if rule.kind == "var":
+        return {"exact": "per-run value", "oneof": "per-run list", "under": "per-run folders"}[v]
+    if rule.kind == "range":
+        return f"range {v[0]}..{v[1]}"
+    if rule.kind == "wildcard":
+        return "any"
+    if rule.kind == "under":
+        return f"under {', '.join(v)}"
+    text = f"{rule.kind} {v!r}"
+    return text if len(text) <= 44 else text[:41] + "..."
+
+
+def _template(steps, records, args):
+    matches = [s for s in steps if s == args.step] or [s for s in steps if s.startswith(args.step)]
+    if len(matches) != 1:
+        print(f"--step {args.step!r} matches {len(matches)} steps: {', '.join(steps)}", file=sys.stderr)
+        return 2
+    step = matches[0]
+    rules = steps[step]
+    values = {}
+    if args.from_run:
+        run = [r for r in records if r["run"] == args.from_run]
+        if not run:
+            print(f"--from-run {args.from_run!r} is not in the traces", file=sys.stderr)
+            return 2
+        values = run_values(rules, [r for r in run if r["step"] == step], run)
+    for item in args.set:
+        name, _, value = item.partition("=")
+        values[name] = _parse_value(value, rules, name)
+    try:
+        doc = template(bound_only(rules, values) if args.from_run else rules, name=step.split("+")[0],
+                       ttl=args.ttl, bindings=values)
+    except Unsupported as e:
+        print(f"step {step} cannot be written as a template:", file=sys.stderr)
+        for gap in e.gaps:
+            print(f"  {gap}", file=sys.stderr)
+        return 2
+    text = dump(doc)
+    if args.out:
+        Path(args.out).write_text(text)
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
+def _parse_value(value, rules, name):
+    kinds = {r.value for args in rules.values() for a, r in args.items() if a == name and r.kind == "var"}
+    if kinds & {"oneof", "under"}:
+        return value.split(",")
+    return int(value) if value.isdigit() else value
+
+
+if __name__ == "__main__":
+    sys.exit(main())

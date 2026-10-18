@@ -5,7 +5,6 @@ Usage: uv run python tests/record_runs.py OUT.jsonl
 """
 import asyncio
 import itertools
-import json
 import sys
 import uuid
 from datetime import timedelta
@@ -21,6 +20,7 @@ from fixagent.agent import activities as act  # noqa: E402
 from fixagent.agent.llm import ScriptedLLM, Step  # noqa: E402
 from fixagent.agent.workers import set_holder_key, worker  # noqa: E402
 from fixagent.agent.workflow import WORKFLOW_QUEUE, FixRunWorkflow, RunInput  # noqa: E402
+from warrantgen.record_temporal import TemporalRecorder  # noqa: E402
 
 SITES = [
     dict(slug="acme", repo="acme/site", base="main", domain="acme.com", root="public", code_root="web"),
@@ -81,12 +81,8 @@ def fetch_for(domain):
 
 async def main(out):
     issuer, holder = SigningKey.generate(), SigningKey.generate()
-    rows = []
-
-    def audit(e):
-        rows.append({"run": e.workflow_id, "step": "+".join(sorted(e.warrant_capabilities)), "tool": e.tool,
-                     "args": e.arguments, "decision": e.decision, "warrant_id": e.warrant_id})
-
+    Path(out).unlink(missing_ok=True)
+    audit = TemporalRecorder(out)
     env = await WorkflowEnvironment.start_local()
     set_holder_key(holder)
     workers = [worker(role, env.client, issuer.public_key, audit=audit if role in ("executor", "llm") else None)
@@ -112,8 +108,7 @@ async def main(out):
         await w.shutdown()
     await asyncio.gather(*tasks, return_exceptions=True)
     await env.shutdown()
-    Path(out).write_text("".join(json.dumps(r, default=str) + "\n" for r in rows))
-    print(f"{len(rows)} decisions -> {out}")
+    print(f"{sum(1 for _ in open(out))} decisions -> {out}")
 
 
 if __name__ == "__main__":

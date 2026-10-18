@@ -10,29 +10,12 @@ from collections import Counter
 from tenuo import Authorizer, SigningKey
 
 from warrantgen import infer, load_trace, mint
+from warrantgen.infer import bound_only as usable, run_values as bindings  # noqa: F401 (cli_roundtrip imports them)
 
 
 def is_attack(r):
     """Ground truth: what seo-agent's hand-written warrants denied when the trace was recorded."""
     return r["decision"] == "DENY"
-
-
-def bindings(rules, calls, run_calls):
-    """Values for per-run arguments: from this step's calls, else anywhere in the run (the minter's context)."""
-    out = {}
-    for args in rules.values():
-        for arg, rule in args.items():
-            if rule.kind == "var":
-                seen = [c["args"][arg] for c in calls if arg in c["args"]] or [
-                    c["args"][arg] for c in run_calls if arg in c["args"]]
-                if seen:
-                    out[arg] = seen[0] if rule.value == "exact" else sorted(set(seen))
-    return out
-
-
-def usable(rules, bound):
-    """Drop tools whose per-run arguments this run never revealed: the run does not call them."""
-    return {t: a for t, a in rules.items() if all(r.kind != "var" or n in bound for n, r in a.items())}
 
 
 def allowed(warrant, issuer, holder, tool, args):

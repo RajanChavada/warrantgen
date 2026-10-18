@@ -163,3 +163,21 @@ def _key(v):
 
 def _single_run_note(by_run):
     return "seen in one run only: may be a per-run value (use --var)" if len(by_run) == 1 else ""
+
+
+def run_values(step_rules, step_calls, run_calls):
+    """Values for per-run arguments: from this step's calls, else anywhere in the run (the minter's context)."""
+    out = {}
+    for args in step_rules.values():
+        for arg, rule in args.items():
+            if rule.kind == "var":
+                seen = [c["args"][arg] for c in step_calls if arg in c["args"]] or [
+                    c["args"][arg] for c in run_calls if arg in c["args"]]
+                if seen:
+                    out[arg] = seen[0] if rule.value == "exact" else sorted(set(seen))
+    return out
+
+
+def bound_only(step_rules, values):
+    """Drop tools whose per-run arguments have no value: the run does not call them."""
+    return {t: a for t, a in step_rules.items() if all(r.kind != "var" or n in values for n, r in a.items())}
