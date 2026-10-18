@@ -43,3 +43,7 @@ They pass against the inferred warrants. Appending a `warrant_for` that calls se
 - 4 near-misses are allowed, where `phases.py` is looser than recorded behavior: `branch` and `head` take any
   `fixagent/*` branch though each run uses one, and `size` allows 20000 bytes where the largest write was 503.
 
+Acting on it (2026-10-17): seo-agent now names the branch before minting the write warrant and pins it with
+`Exact(branch)`; the minter refuses a branch that isn't a safe `fixagent/` name. Result: 43/44. `size` stays at
+20000 on purpose: the recorded writes are the demo's tiny fixtures, and a real `layout.tsx` is larger.
+
