@@ -1,5 +1,7 @@
 # warrantgen
 
+[![tests](https://github.com/RajanChavada/warrantgen/actions/workflows/tests.yml/badge.svg)](https://github.com/RajanChavada/warrantgen/actions/workflows/tests.yml)
+
 Record what your AI agent actually does, then get the narrowest [Tenuo](https://github.com/tenuo-ai/tenuo) warrant
 that still allows it: signed, per step, per sub-agent, with tests that keep it honest in CI.
 
