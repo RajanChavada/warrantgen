@@ -7,6 +7,7 @@ from pathlib import Path
 from warrantgen.chain import hop_rules, hop_values, mint_chains
 from warrantgen.emit import Unsupported, dump, template
 from warrantgen.infer import bound_only, infer, load_trace, run_values
+from warrantgen.testgen import render_tests
 
 
 def main(argv=None):
@@ -14,7 +15,8 @@ def main(argv=None):
     commands = parser.add_subparsers(dest="command", required=True)
     for name, help_text in (("infer", "show the rules inferred for each step"),
                             ("template", "write one step as a tenuo-cli template (version 2)"),
-                            ("chain", "show the per-hop delegation tree and check each hop narrows")):
+                            ("chain", "show the per-hop delegation tree and check each hop narrows"),
+                            ("test", "write pytest tests: recorded calls allowed, near-misses denied")):
         sub = commands.add_parser(name, help=help_text)
         sub.add_argument("traces", nargs="+", help="trace files (JSON lines)")
         sub.add_argument("--var", action="append", default=[], help="treat this argument as a per-run value")
@@ -22,6 +24,7 @@ def main(argv=None):
         sub.add_argument("--headroom", default="1", help="scale range maxima before rounding up, or 'none'")
     commands.choices["infer"].add_argument("--json", action="store_true", help="print rules as JSON")
     commands.choices["chain"].add_argument("--from-run", help="mint every hop with this run's values")
+    commands.choices["test"].add_argument("--out", help="write here instead of stdout")
     tpl = commands.choices["template"]
     tpl.add_argument("--step", required=True, help="step name, or a unique prefix of it")
     tpl.add_argument("--from-run", help="fill per-run values from this recorded run")
@@ -38,6 +41,10 @@ def main(argv=None):
         return _show(steps, excluded, args.json)
     if args.command == "chain":
         return _chain(records, args, excluded)
+    if args.command == "test":
+        text = render_tests(steps, [r for r in records if r["run"] not in excluded], source=", ".join(args.traces))
+        Path(args.out).write_text(text) if args.out else sys.stdout.write(text)
+        return 0
     return _template(steps, records, args)
 
 

@@ -32,3 +32,14 @@ rather than written looser than inferred:
 
 Every step also needs this run's values filled in (repo, branch, PR number), because templates have no variables.
 Explore is where the injected `.env` reads happen, so the CLI path can't yet protect the step that matters most.
+
+## Generated tests against the hand-written warrants
+
+`warrantgen test traces.jsonl --out test_warrants.py` writes 44 tests (recorded calls allowed, near-misses denied).
+They pass against the inferred warrants. Appending a `warrant_for` that calls seo-agent's own `phase_warrant()`
+(mapping each step to its phase) tests the production warrants instead:
+
+- 40/44 pass. No recorded call is denied.
+- 4 near-misses are allowed, where `phases.py` is looser than recorded behavior: `branch` and `head` take any
+  `fixagent/*` branch though each run uses one, and `size` allows 20000 bytes where the largest write was 503.
+

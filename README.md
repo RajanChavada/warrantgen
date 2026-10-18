@@ -38,6 +38,9 @@ tenuo-cli warrant issue --template write.yaml --holder agent
   sits under `team`, under the root) and mints it through Tenuo's delegation API, so Tenuo checks every hop narrows.
   Each sub-agent gets only its own tools; an argument Tenuo won't narrow keeps its parent's constraint and is listed.
   In Python: `warrantgen.chain.hop_rules`, `hop_values`, `mint_chains`.
+- `warrantgen test traces.jsonl --out test_warrants.py` writes pytest tests: each step's recorded calls must be
+  allowed and near-misses (one argument just outside its rule, or an unused tool) denied. Point the generated
+  `warrant_for` at your own minting code to test the warrants you ship against recorded behavior.
 - `template` exits 2 with the reasons when a step needs something tenuo-cli templates can't express yet
   ([tenuo#959](https://github.com/tenuo-ai/tenuo/issues/959)). In Python, `warrantgen.mint` mints any step directly.
 
