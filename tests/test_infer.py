@@ -70,6 +70,11 @@ def test_reads_generalize_to_folders_writes_stay_exact():
     assert one_site["read_file"]["path"].kind == "under" and one_site["read_file"]["path"].value == ["public", "web"]
 
 
+def test_slash_in_a_value_does_not_make_it_a_path():
+    trace = [call("a1", "s", "get_pr_state", repo="acme/site"), call("b1", "s", "get_pr_state", repo="bakery/web")]
+    assert infer(trace)[0]["s"]["get_pr_state"]["repo"] == Rule("var", "exact", "differs per run")
+
+
 def test_minted_folder_rule_allows_new_files_and_denies_secrets():
     issuer, holder = SigningKey.generate(), SigningKey.generate()
     w = mint({"read_file": {"path": Rule("under", ["public", "web"])}}, issuer, holder.public_key, ttl=300)

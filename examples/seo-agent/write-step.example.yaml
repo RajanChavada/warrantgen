@@ -1,0 +1,26 @@
+# Write step for run acme-both, inferred from the other 14 runs. Issue with:
+#   tenuo-cli warrant issue --template write-step.example.yaml --holder agent
+version: 2
+name: write
+ttl: 5m
+capabilities:
+  create_branch:
+    repo: acme/site
+    base: main
+    branch: fixagent/agent-20261018-014812
+  write_file:
+    repo: acme/site
+    branch: fixagent/agent-20261018-014812
+    path:
+    - public/llms.txt
+    - public/robots.txt
+    - web/app/layout.tsx
+    size: 1..503
+    text: any
+    message: any
+  open_pr:
+    repo: acme/site
+    base: main
+    head: fixagent/agent-20261018-014812
+    title: any
+    body: any

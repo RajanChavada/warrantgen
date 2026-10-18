@@ -118,8 +118,9 @@ def _prefix(values):
 
 
 def _relative_paths(arg, values):
-    return all(isinstance(v, str) and v and not v.startswith("/") for v in values) and (
-        any(word in arg.lower() for word in PATH_ARGS) or all("/" in v for v in values))
+    # By name only: "acme/site" has a slash but a repo is not a folder to widen into.
+    return any(word in arg.lower() for word in PATH_ARGS) and all(
+        isinstance(v, str) and v and not v.startswith("/") for v in values)
 
 
 def _key(v):
