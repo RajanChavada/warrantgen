@@ -40,7 +40,9 @@ tenuo-cli warrant issue --template write.yaml --holder agent
   In Python: `warrantgen.chain.hop_rules`, `hop_values`, `mint_chains`.
 - `warrantgen test traces.jsonl --out test_warrants.py` writes pytest tests: each step's recorded calls must be
   allowed and near-misses (one argument just outside its rule, or an unused tool) denied. Point the generated
-  `warrant_for` at your own minting code to test the warrants you ship against recorded behavior.
+  `warrant_for` at your own minting code to test the warrants you ship against recorded behavior:
+  `--warrant-for module:function` imports your `(step, values, issuer, holder_public_key)` hook so the file needs
+  only tenuo and pytest, and `--known-looser ARG` marks arguments you loosen on purpose as strict xfails.
 - `template` exits 2 with the reasons when a step needs something tenuo-cli templates can't express yet
   ([tenuo#959](https://github.com/tenuo-ai/tenuo/issues/959)). In Python, `warrantgen.mint` mints any step directly.
 

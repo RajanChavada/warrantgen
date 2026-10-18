@@ -40,8 +40,51 @@ def test_generated_tests_pass_and_cover_each_rule(tmp_path):
 def test_generated_tests_catch_a_loosened_warrant(tmp_path):
     path = tmp_path / "test_warrants.py"
     path.write_text(generate(infer(TRACE)[0], TRACE).replace(
-        "def warrant_for(step, values):\n",
-        "def warrant_for(step, values):\n"
+        "def warrant_for(step, values, issuer, holder_public_key):\n",
+        "def warrant_for(step, values, issuer, holder_public_key):\n"
         "    STEPS['write']['rules']['write_file']['size'] = Rule('range', (0, 10**9))\n"))
     code, out = run_pytest(path)
     assert code == 1 and "1 failed" in out and "size: above the range" in out
+
+
+HOOK = """from warrantgen import infer, mint
+from warrantgen.infer import Rule
+from test_data import TRACE
+
+RULES = infer(TRACE)[0]
+
+
+def warrant_for(step, values, issuer, holder_public_key):
+    rules = {t: dict(a) for t, a in RULES[step].items()}
+    if LOOSER and step == "write":
+        rules["write_file"]["size"] = Rule("range", (0, 10**9))
+    return mint(rules, issuer, holder_public_key, ttl=300, bindings=values)
+"""
+
+
+def write_hook(tmp_path, looser):
+    (tmp_path / "test_data.py").write_text(f"TRACE = {TRACE!r}\n")
+    (tmp_path / "my_warrants.py").write_text(f"LOOSER = {looser}\n" + HOOK)
+
+
+def test_hook_mode_imports_no_warrantgen_and_tests_your_warrants(tmp_path):
+    write_hook(tmp_path, looser=False)
+    path = tmp_path / "test_warrants.py"
+    path.write_text(generate(infer(TRACE)[0], TRACE, warrant_for="my_warrants:warrant_for"))
+    text = path.read_text()
+    assert "from my_warrants import warrant_for as warrant_for" in text
+    assert "from warrantgen" not in text and "Rule(" not in text
+    code, out = run_pytest(path)
+    assert code == 0, out
+
+
+def test_known_looser_is_a_strict_xfail(tmp_path):
+    write_hook(tmp_path, looser=True)
+    path = tmp_path / "test_warrants.py"
+    path.write_text(generate(infer(TRACE)[0], TRACE, warrant_for="my_warrants:warrant_for", known_looser=["size"]))
+    code, out = run_pytest(path)
+    assert code == 0 and "1 xfailed" in out, out
+    write_hook(tmp_path, looser=False)  # tightened later: the stale mark fails until it is removed
+    code, out = run_pytest(path)
+    assert code == 1 and "XPASS(strict)" in out, out
+

@@ -25,6 +25,10 @@ def main(argv=None):
     commands.choices["infer"].add_argument("--json", action="store_true", help="print rules as JSON")
     commands.choices["chain"].add_argument("--from-run", help="mint every hop with this run's values")
     commands.choices["test"].add_argument("--out", help="write here instead of stdout")
+    commands.choices["test"].add_argument("--warrant-for", metavar="MODULE:FUNCTION",
+                                          help="test your own warrants: (step, values, issuer, holder_public_key)")
+    commands.choices["test"].add_argument("--known-looser", action="append", default=[], metavar="ARG",
+                                          help="an argument your warrants loosen on purpose (strict xfail)")
     tpl = commands.choices["template"]
     tpl.add_argument("--step", required=True, help="step name, or a unique prefix of it")
     tpl.add_argument("--from-run", help="fill per-run values from this recorded run")
@@ -42,7 +46,8 @@ def main(argv=None):
     if args.command == "chain":
         return _chain(records, args, excluded)
     if args.command == "test":
-        text = render_tests(steps, [r for r in records if r["run"] not in excluded], source=", ".join(args.traces))
+        text = render_tests(steps, [r for r in records if r["run"] not in excluded], source=", ".join(args.traces),
+                            warrant_for=args.warrant_for, known_looser=args.known_looser)
         Path(args.out).write_text(text) if args.out else sys.stdout.write(text)
         return 0
     return _template(steps, records, args)
