@@ -15,7 +15,18 @@ Status: **open** (not reported), **reported** (link), **fixed** (commit), **by d
 | T6 | No `any_of` | Multi-host fetch rules (`AnyOf` of `UrlPattern`s) are refused by the emitter | Steps that fetch from several hosts can't go through the CLI | open (add to #959) |
 | T5 | Plain `"any"` and `"1..5"` strings parse as wildcard and range | `warrant_template.py` `expanded_constraint` | Emitter writes `{exact: ...}` for these | worked around |
 
-Reported as [#959](https://github.com/tenuo-ai/tenuo/issues/959) (pointer on #943). Original ask: `warrant issue --set name=value` for T1, then `all`/`not` and
+Reported as [#959](https://github.com/tenuo-ai/tenuo/issues/959). Maintainer answer: yes, as three PRs after the CLI stack
+merges, in this order and shape:
+1. `subset`, mapping to `Subset`.
+2. `all` / `not` with core semantics. For paths the allowlist must be `subpath`, because a negated regex doesn't
+   normalize paths; `not` is for value exclusions only.
+3. Per-issue values as `--set name=value` that **narrows** an argument the template already bounds (one-of,
+   subpath, pattern) to an exact value, checked by core attenuation. No unbounded `{var}`; the template is the ceiling.
+
+What this changes in warrantgen: the folder rule should become `All([Subpath(root), Not(Regex(secret))])` once
+paths are absolute, and per-run values should be emitted as a bounded ceiling plus `--set`, not as a variable.
+
+Original ask: `warrant issue --set name=value` for T1, then `all`/`not` and
 `subset` forms for T2 and T3. Cite: 41 issued, 2 of 5 seo-agent steps not expressible, and T2 is the step
 that stops injected reads.
 
@@ -34,8 +45,8 @@ that stops injected reads.
 | # | Issue | PR | Status |
 |---|---|---|---|
 | C1 | Issuer and approver keys readable by the agent's user; `init --dev` put them in the project | #942 | fixed in `cb440d2` (`~/.tenuo` default, docs); isolation left to the user, by design |
-| C2 | `warrant reissue` brings back a revoked warrant | #944 | reported ([comment](https://github.com/tenuo-ai/tenuo/pull/944#issuecomment-6244548322)), reproduced at `088adb07` and `cb440d2` |
-| C3 | `--holder some.pub` resolves from the template's folder, not the current directory | #944 | reported (same comment), reproduced at `088adb07` and `cb440d2` |
+| C2 | `warrant reissue` brings back a revoked warrant | #944 | fix PR [#960](https://github.com/tenuo-ai/tenuo/pull/960), requested by the maintainer |
+| C3 | `--holder some.pub` resolves from the template's folder, not the current directory | #944 | fix PR #960 |
 | C4 | Approval gates needing 2+ approvers can never pass | #945 | open, traced |
 | C5 | `audit verify` accepts receipts the agent forged (signed with its own key) | #950 | open, traced |
 | C6 | Agent can write its own warrant file and `receipts.jsonl` (same user, 0600) | #950 | open; probe candidate |
