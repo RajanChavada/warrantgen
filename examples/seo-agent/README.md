@@ -6,5 +6,12 @@ with Tenuo's plugin checking every activity. GitHub and the model are scripted; 
 - `record_runs.py`: copy into seo-agent's `tests/` and run `uv run python tests/record_runs.py traces.jsonl`.
 - `evaluate.py`: leave-one-run-out replay through Tenuo's authorizer.
 
-Result on 2026-10-17: 182/186 legitimate calls allowed on unseen runs, 6/6 injected `.env` reads denied.
-The 4 misses are files only one run per site read; `phases.py` covers them with a rule derived from the site roots.
+Results (2026-10-17), legitimate calls allowed on unseen runs / injected `.env` reads denied:
+
+| Version | Legit | Attacks |
+|---|---|---|
+| Exact file lists | 182/186 | 6/6 |
+| Reads generalize to their folders, minus secrets and `..` | 186/186 | 6/6 |
+| Mutation check: reads unconstrained | 186/186 | 0/6 |
+
+The mutation row shows the replay can fail: the 6/6 comes from the folder rule.

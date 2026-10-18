@@ -59,6 +59,28 @@ def test_patterns_from_real_seo_agent_traces():
     assert rules["fixes"] == Rule("subset", ["org-schema", "site-files"])
 
 
+def test_reads_generalize_to_folders_writes_stay_exact():
+    trace = [call("a1", "s", "read_file", path="public/robots.txt"), call("a1", "s", "read_file", path="web/app/x.tsx"),
+             call("a1", "s", "write_file", path="public/robots.txt"), call("a1", "s", "write_file", path="public/llms.txt"),
+             call("b1", "s", "read_file", path="static/index.html"), call("b1", "s", "write_file", path="static/llms.txt")]
+    rules = infer(trace)[0]["s"]
+    assert rules["read_file"]["path"].kind == "var" and rules["read_file"]["path"].value == "under"
+    assert rules["write_file"]["path"] == Rule("var", "oneof", rules["write_file"]["path"].note)
+    one_site = infer([r for r in trace if r["run"] == "a1"])[0]["s"]
+    assert one_site["read_file"]["path"].kind == "under" and one_site["read_file"]["path"].value == ["public", "web"]
+
+
+def test_minted_folder_rule_allows_new_files_and_denies_secrets():
+    issuer, holder = SigningKey.generate(), SigningKey.generate()
+    w = mint({"read_file": {"path": Rule("under", ["public", "web"])}}, issuer, holder.public_key, ttl=300)
+    for path in ("public/never-seen.html", "web/app/layout.tsx", "web"):
+        check(w, issuer, holder, "read_file", {"path": path})
+    for path in ("public/.env", "web/.env.local", "public/../payments-api/x", "../public/x", "other/x",
+                 "web/id_ed25519", "public/%2e%2e/x", "publicity/x"):
+        with pytest.raises(ConstraintViolation):
+            check(w, issuer, holder, "read_file", {"path": path})
+
+
 def test_taint_reason_is_short():
     convo = "x" * 5000 + ' {"path": "../payments-api/.env"} ' + "y" * 5000
     reasons = infer([call("r1", "s", "llm_turn", conversation=convo)])[1]["r1"]

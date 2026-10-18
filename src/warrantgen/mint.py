@@ -1,10 +1,24 @@
 """Build a real signed Tenuo warrant from inferred rules."""
-from tenuo import Exact, OneOf, Pattern, Range, Subpath, Subset, Warrant, Wildcard
+import re
+
+from tenuo import All, Exact, Not, OneOf, Pattern, Range, Regex, Subpath, Subset, Warrant, Wildcard
+
+# Same shape as seo-agent's readable(): under the folders, never a secret file, never `..`.
+SECRET = (r"(?i)(^|/)(\.env[^/]*|\.git|\.ssh|secrets?|credentials?|[^/]*(secret|credential|private)[^/]*|"
+          r"id_(rsa|dsa|ecdsa|ed25519)[^/]*|\.npmrc|\.netrc|\.pypirc|[^/]*\.(pem|key|p12|pfx))(/|$)")
+PARENT = r"(^|/)\.\.(/|$)"
+SAFE_CHARS = r"[A-Za-z0-9._@+()\[\]/-]"  # no %, so an encoded `..` or `/` cannot slip past
 
 
 def exact(value):
     # Tenuo's Exact takes strings only; a pinned number is a one-point range.
     return Range(min=value, max=value) if isinstance(value, (int, float)) else Exact(value)
+
+
+def under(paths):
+    dirs = sorted({p.split("/")[0] for p in paths})
+    prefix = r"^(" + "|".join(re.escape(d) for d in dirs) + rf")(/{SAFE_CHARS}*)?$"
+    return All([Regex(prefix), Not(Regex(SECRET)), Not(Regex(PARENT))])
 
 
 def constraint(rule, binding=None):
@@ -13,9 +27,13 @@ def constraint(rule, binding=None):
     if rule.kind == "var":
         if binding is None:
             raise ValueError("a per-run argument needs a value at mint time")
+        if rule.value == "under":
+            return under(binding)
         return exact(binding) if rule.value == "exact" else OneOf(list(binding))
     if rule.kind == "oneof":
         return OneOf(list(rule.value))
+    if rule.kind == "under":
+        return under(rule.value)
     if rule.kind == "subset":
         return Subset(list(rule.value))
     if rule.kind == "range":

@@ -18,14 +18,17 @@ SUSPICIOUS = re.compile(
 )
 FREE_TEXT_LEN = 80  # longer strings, or any with whitespace, are free text: identifiers rarely have spaces
 MIN_PREFIX = 3
+READ_VERBS = ("read", "list", "get", "fetch", "search", "view")
+PATH_ARGS = ("path", "dir", "file", "folder")
 
 
 @dataclass(frozen=True)
 class Rule:
-    """How one argument is constrained. kind: exact, var, oneof, subset, range, pattern, subpath, wildcard.
+    """How one argument is constrained. kind: exact, var, oneof, subset, range, pattern, subpath, under, wildcard.
 
     var: the value is fixed within a run but differs between runs, so it becomes a mint-time
-    parameter. `value` then says whether that parameter is one value ("exact") or a list ("oneof").
+    parameter. `value` then says whether that parameter is one value ("exact"), a list ("oneof"),
+    or the folders a path must stay under ("under").
     """
     kind: str
     value: object = None
@@ -61,11 +64,11 @@ def infer(records, *, variables=(), exact=()):
             calls.setdefault((r["step"], r["tool"], arg), {}).setdefault(r["run"], []).append(value)
     steps = {}
     for (step, tool, arg), by_run in calls.items():
-        steps.setdefault(step, {}).setdefault(tool, {})[arg] = _rule(arg, by_run, arg in variables, arg in exact)
+        steps.setdefault(step, {}).setdefault(tool, {})[arg] = _rule(tool, arg, by_run, arg in variables, arg in exact)
     return steps, excluded
 
 
-def _rule(arg, by_run, force_var, force_exact):
+def _rule(tool, arg, by_run, force_var, force_exact):
     values = [v for vs in by_run.values() for v in vs]
     distinct = set(map(_key, values))
     per_run = [set(map(_key, vs)) for vs in by_run.values()]
@@ -77,12 +80,19 @@ def _rule(arg, by_run, force_var, force_exact):
         return Rule("wildcard", note="free text: confirm it does not change what the tool does")
     if all(isinstance(v, list) and all(isinstance(i, (str, int)) for i in v) for v in values):
         return Rule("subset", sorted({i for v in values for i in v}, key=str))
+    # Reads generalize to the folders they touched; writes keep their exact files.
+    if not force_exact and tool.startswith(READ_VERBS) and _relative_paths(arg, values):
+        dirs = [{v.split("/")[0] for v in vs} for vs in by_run.values()]
+        note = "under these folders, minus secrets and '..'"
+        if len(by_run) > 1 and any(d != dirs[0] for d in dirs):
+            return Rule("var", "under", note="differs per run; " + note)
+        return Rule("under", sorted(dirs[0]), note=note)
     if force_exact or (len(distinct) == 1 and not force_var):
         if len(distinct) > 1:
             return Rule("oneof", sorted(distinct, key=str), note="forced exact but several values seen")
         return Rule("exact", values[0], note=_single_run_note(by_run))
-    # One value per run (repo, base branch, PR number), or a list no other run shares: a per-run parameter.
-    per_run_value = len(by_run) > 1 and (one_per_run or (_disjoint(per_run) and not numeric))
+    # One value per run (repo, base branch, PR number), or a list that changes per run: a per-run parameter.
+    per_run_value = len(by_run) > 1 and (one_per_run or (not numeric and len(set(map(frozenset, per_run))) > 1))
     if force_var or per_run_value:
         prefix = _prefix(values)
         note = f"differs per run; or Pattern({prefix}*) if unknown at mint time" if prefix else "differs per run"
@@ -107,17 +117,15 @@ def _prefix(values):
     return prefix if len(prefix) >= MIN_PREFIX else ""
 
 
+def _relative_paths(arg, values):
+    return all(isinstance(v, str) and v and not v.startswith("/") for v in values) and (
+        any(word in arg.lower() for word in PATH_ARGS) or all("/" in v for v in values))
+
+
 def _key(v):
     return json.dumps(v, sort_keys=True) if isinstance(v, (dict, list)) else v
 
 
-def _disjoint(sets):
-    seen = set()
-    for s in sets:
-        if seen & s:
-            return False
-        seen |= s
-    return True
 
 
 def _single_run_note(by_run):
