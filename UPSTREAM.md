@@ -8,13 +8,13 @@ Status: **open** (not reported), **reported** (link), **fixed** (commit), **by d
 
 | # | Issue | Evidence | Effect on warrantgen | Status |
 |---|---|---|---|---|
-| T1 | No variables: every value is fixed when the YAML is written | `cli_roundtrip.py`: all 41 issued templates needed the run's repo, branch and PR number filled in | One template per run; can't ship a reusable template | open |
-| T2 | No `all` / `not` | Explore step refused in every run: "under the site folders, minus secrets and `..`" | The step that blocks injected `.env` reads can't go through the CLI | open |
-| T3 | No `subset` | Build step refused in every run (`fixes` from the catalog) | Build can't go through the CLI | open |
+| T1 | No variables: every value is fixed when the YAML is written | `cli_roundtrip.py`: all 41 issued templates needed the run's repo, branch and PR number filled in | One template per run; can't ship a reusable template | reported #959 |
+| T2 | No `all` / `not` | Explore step refused in every run: "under the site folders, minus secrets and `..`" | The step that blocks injected `.env` reads can't go through the CLI | reported #959 |
+| T3 | No `subset` | Build step refused in every run (`fixes` from the catalog) | Build can't go through the CLI | reported #959 |
 | T4 | `one_of` takes strings only | Emitter refuses numeric one-of | Rare; numbers usually become ranges | open |
 | T5 | Plain `"any"` and `"1..5"` strings parse as wildcard and range | `warrant_template.py` `expanded_constraint` | Emitter writes `{exact: ...}` for these | worked around |
 
-Proposed upstream ask (needs an issue first): `warrant issue --set name=value` for T1, then `all`/`not` and
+Reported as [#959](https://github.com/tenuo-ai/tenuo/issues/959) (pointer on #943). Original ask: `warrant issue --set name=value` for T1, then `all`/`not` and
 `subset` forms for T2 and T3. Cite: 41 issued, 2 of 5 seo-agent steps not expressible, and T2 is the step
 that stops injected reads.
 
