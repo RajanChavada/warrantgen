@@ -59,4 +59,6 @@ def _value(rule, binding):
         return {kind: value}
     if kind == "wildcard":
         return "any"
+    if kind == "url_patterns":
+        raise ValueError("needs any_of (one URL pattern per host), which templates cannot express")
     raise ValueError(f"needs {kind}, which templates cannot express")

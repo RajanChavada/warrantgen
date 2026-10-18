@@ -30,3 +30,8 @@ def test_refuses_instead_of_widening():
     with pytest.raises(Unsupported) as e:
         template(rules, name="x", bindings={"path": ["web/x"]})
     assert [g.split(":")[0] for g in e.value.gaps] == ["read_file.path", "build.fixes", "build.repo"]
+
+
+def test_refuses_any_of_urls():
+    with pytest.raises(Unsupported, match="any_of"):
+        template({"fetch": {"url": Rule("url_patterns", ["https://a.example/*", "https://b.example/*"])}}, name="x")

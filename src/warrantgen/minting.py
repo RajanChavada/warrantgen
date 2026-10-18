@@ -1,7 +1,7 @@
 """Build a real signed Tenuo warrant from inferred rules."""
 import re
 
-from tenuo import All, Exact, Not, OneOf, Pattern, Range, Regex, Subpath, Subset, UrlPattern, Warrant, Wildcard
+from tenuo import All, AnyOf, Exact, Not, OneOf, Pattern, Range, Regex, Subpath, Subset, UrlPattern, Warrant, Wildcard
 
 # Same shape as seo-agent's readable(): under the folders, never a secret file, never `..`.
 SECRET = (r"(?i)(^|/)(\.env[^/]*|\.git|\.ssh|secrets?|credentials?|[^/]*(secret|credential|private)[^/]*|"
@@ -50,6 +50,8 @@ def constraint(rule, binding=None):
     if rule.kind == "url_pattern":
         # Not Pattern: a plain glob lets ".../library/../../internal" climb out of the prefix.
         return UrlPattern(rule.value)
+    if rule.kind == "url_patterns":
+        return AnyOf([UrlPattern(p) for p in rule.value])
     if rule.kind == "subpath":
         return Subpath(rule.value)
     if rule.kind == "wildcard":

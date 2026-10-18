@@ -5,6 +5,8 @@ rules are inferred from its own calls and all its descendants', so a parent alwa
 minted through Tenuo's delegation API, so Tenuo itself checks that every hop only narrows.
 """
 from warrantgen.infer import infer, run_values
+from tenuo import AnyOf, UrlPattern
+
 from warrantgen.minting import constraint, mint, under
 
 
@@ -70,6 +72,9 @@ def _candidate(parent_rule, parent_value, rule, value):
     parent_folders, folders = _folders(parent_rule, parent_value), _folders(rule, value)
     if parent_folders and folders:
         return under(folders, within=parent_folders)  # Tenuo narrows an All only by adding parts
+    if parent_rule.kind == "url_patterns" and rule.kind in ("url_pattern", "url_patterns"):
+        # Tenuo narrows an AnyOf only into a smaller AnyOf, never into a bare UrlPattern.
+        return AnyOf([UrlPattern(p) for p in ([rule.value] if rule.kind == "url_pattern" else rule.value)])
     return constraint(rule, value)
 
 

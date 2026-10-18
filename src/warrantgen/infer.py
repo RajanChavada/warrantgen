@@ -28,7 +28,8 @@ MONEY = re.compile(r"(?i)amount|price|cost|cents|fee|total|balance|payment|charg
 
 @dataclass(frozen=True)
 class Rule:
-    """How one argument is constrained. kind: exact, var, oneof, subset, range, pattern, url_pattern, subpath, under, wildcard.
+    """How one argument is constrained. kind: exact, var, oneof, subset, range, pattern, url_pattern, url_patterns, subpath, under,
+    wildcard.
 
     var: the value is fixed within a run but differs between runs, so it becomes a mint-time
     parameter. `value` then says whether that parameter is one value ("exact"), a list ("oneof"),
@@ -93,11 +94,15 @@ def _rule(tool, arg, by_run, force_var, force_exact, headroom):
         if len(by_run) > 1 and any(d != dirs[0] for d in dirs):
             return Rule("var", "under", note="differs per run; " + note)
         return Rule("under", sorted(dirs[0]), note=note)
-    # Pages a read tool fetches are chosen while it runs, so they generalize to a URL prefix on one host.
+    # Pages a read tool fetches are chosen while it runs, so they generalize to a URL prefix per host.
     if not force_exact and tool.startswith(READ_VERBS) and all(isinstance(v, str) and URL.match(v) for v in values):
-        prefix = _prefix(values)
-        if URL.match(prefix):
-            return Rule("url_pattern", prefix + "*", note="pages under this URL prefix; resolves '..' and encodings")
+        by_host = {}
+        for v in values:
+            by_host.setdefault(URL.match(v).group(0), []).append(v)
+        prefixes = sorted(_prefix(vs) + "*" for vs in by_host.values())
+        if len(prefixes) == 1:
+            return Rule("url_pattern", prefixes[0], note="pages under this URL prefix; resolves '..' and encodings")
+        return Rule("url_patterns", prefixes, note="pages under one URL prefix per host")
     if force_exact or (len(distinct) == 1 and not force_var):
         if len(distinct) > 1:
             return Rule("oneof", sorted(distinct, key=str), note="forced exact but several values seen")

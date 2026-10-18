@@ -84,15 +84,33 @@ def test_folder_reads_narrow_per_hop_inside_the_parent(tmp_path):
             site.invoke({"path": path})
 
 
+def test_hosts_narrow_per_hop_inside_the_parents_any_of(tmp_path):
+    rows = [{"run": run, "step": step, "tool": "fetch", "args": {"url": url}}
+            for run, page in (("r1", "a"), ("r2", "b"))
+            for step, url in (("a/docs", f"https://docs.python.org/3/{page}.html"),
+                              ("a/pkgs", f"https://pypi.org/project/{page}/"))]
+    hops = hop_rules(rows)
+    assert hops[""]["fetch"]["url"].value == ["https://docs.python.org/3/*", "https://pypi.org/project/*"]
+    issuer = SigningKey.generate()
+    keys = {hop: SigningKey.generate() for hop in hops}
+    chains, notes = mint_chains(hops, issuer, keys, ttl=300)
+    assert notes == []
+    docs = TenuoTool(RAW["fetch"], bound_warrant=chains["a/docs"][-1].bind(keys["a/docs"]),
+                     warrant_chain=chains["a/docs"][:-1], trusted_roots=[issuer.public_key])
+    docs.invoke({"url": "https://docs.python.org/3/library/json.html"})
+    for url in ("https://pypi.org/project/x/", "https://docs.python.org/3/../../internal", "https://evil.com/x"):
+        with pytest.raises(ConstraintViolation):
+            docs.invoke({"url": url})
+
+
 def test_tenuo_refusal_keeps_the_parent_constraint(tmp_path):
-    # Different hosts give the root a per-run URL list; a child can't narrow a one-of into a URL pattern.
-    rows = [{"run": "r1", "step": "a/x", "tool": "fetch", "args": {"url": "https://docs.python.org/3/a.html"}},
-            {"run": "r1", "step": "a/y", "tool": "fetch", "args": {"url": "https://pypi.org/project/x/"}},
-            {"run": "r2", "step": "a/x", "tool": "fetch", "args": {"url": "https://docs.python.org/3/b.html"}},
-            {"run": "r2", "step": "a/y", "tool": "fetch", "args": {"url": "https://pypi.org/project/y/"}}]
+    # An ftp URL next to https ones leaves the parent with a per-run list, which Tenuo won't narrow to a pattern.
+    rows = [{"run": run, "step": step, "tool": "fetch", "args": {"url": url}}
+            for run, page in (("r1", "a"), ("r2", "b"))
+            for step, url in (("a/x", f"https://docs.python.org/3/{page}.html"), ("a/y", f"ftp://files.example/{page}"))]
     hops = hop_rules(rows)
     issuer = SigningKey.generate()
     keys = {hop: SigningKey.generate() for hop in hops}
     values = hop_values(hops, [r for r in rows if r["run"] == "r1"])
     _, notes = mint_chains(hops, issuer, keys, ttl=300, values=values)
-    assert notes == ["a/x: fetch.url keeps its parent's constraint", "a/y: fetch.url keeps its parent's constraint"]
+    assert notes == ["a/x: fetch.url keeps its parent's constraint"]

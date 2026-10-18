@@ -12,6 +12,7 @@ Status: **open** (not reported), **reported** (link), **fixed** (commit), **by d
 | T2 | No `all` / `not` | Explore step refused in every run: "under the site folders, minus secrets and `..`" | The step that blocks injected `.env` reads can't go through the CLI | reported #959 |
 | T3 | No `subset` | Build step refused in every run (`fixes` from the catalog) | Build can't go through the CLI | reported #959 |
 | T4 | `one_of` takes strings only | Emitter refuses numeric one-of | Rare; numbers usually become ranges | open |
+| T6 | No `any_of` | Multi-host fetch rules (`AnyOf` of `UrlPattern`s) are refused by the emitter | Steps that fetch from several hosts can't go through the CLI | open (add to #959) |
 | T5 | Plain `"any"` and `"1..5"` strings parse as wildcard and range | `warrant_template.py` `expanded_constraint` | Emitter writes `{exact: ...}` for these | worked around |
 
 Reported as [#959](https://github.com/tenuo-ai/tenuo/issues/959) (pointer on #943). Original ask: `warrant issue --set name=value` for T1, then `all`/`not` and
@@ -49,8 +50,9 @@ that stops injected reads.
 - Read tools are recognized by name prefix (`read`, `list`, `get`, `fetch`, `search`, `view`); paths by argument name.
 - Folder rules take their folders from the run's own calls; a real minter takes them from run settings.
 - Fixed: `warrantgen.mint` was both a function and a module (renamed the module to `minting`).
-- A parent hop that fetches from several hosts gets an exact per-run URL list, not one URL rule per host, so its
-  children can't narrow to their own host (Tenuo refuses one-of to `UrlPattern`). `AnyOf` of per-host
-  `UrlPattern`s would fix it; not done yet.
+- Fixed: a parent hop fetching from several hosts used to get an exact per-run URL list its children couldn't
+  narrow. It now gets `AnyOf` of one `UrlPattern` per host, and children narrow to `AnyOf([their host])`
+  (Tenuo refuses `AnyOf` to a bare `UrlPattern`: "Cannot attenuate Any to UrlPattern").
+- Mixed schemes (an `ftp://` URL next to `https://` ones) still give a per-run list, which children keep.
 - Tenuo narrows an `All` only by adding parts ("child All must include all parent constraints"), so a child's
   folder rule is the parent's `All` plus one more folder regex. Works, but the child's constraint grows per hop.
