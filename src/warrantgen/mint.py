@@ -1,16 +1,23 @@
 """Build a real signed Tenuo warrant from inferred rules."""
-from tenuo import Exact, OneOf, Pattern, Range, Subpath, Warrant, Wildcard
+from tenuo import Exact, OneOf, Pattern, Range, Subpath, Subset, Warrant, Wildcard
+
+
+def exact(value):
+    # Tenuo's Exact takes strings only; a pinned number is a one-point range.
+    return Range(min=value, max=value) if isinstance(value, (int, float)) else Exact(value)
 
 
 def constraint(rule, binding=None):
     if rule.kind == "exact":
-        return Exact(rule.value)
+        return exact(rule.value)
     if rule.kind == "var":
         if binding is None:
             raise ValueError("a per-run argument needs a value at mint time")
-        return Exact(binding) if rule.value == "exact" else OneOf(list(binding))
+        return exact(binding) if rule.value == "exact" else OneOf(list(binding))
     if rule.kind == "oneof":
         return OneOf(list(rule.value))
+    if rule.kind == "subset":
+        return Subset(list(rule.value))
     if rule.kind == "range":
         low, high = rule.value
         return Range(min=low, max=high)

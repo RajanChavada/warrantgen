@@ -47,6 +47,24 @@ def test_injected_run_is_excluded_not_learned():
     assert list(excluded) == ["r3"] and "explore" not in steps
 
 
+def test_patterns_from_real_seo_agent_traces():
+    # Several runs share a site, so a per-run value repeats across runs; timestamps share a long prefix.
+    runs = [("a1", "acme/site", "fixagent/agent-20261018-014809", ["site-files"]),
+            ("a2", "acme/site", "fixagent/agent-20261018-014833", ["org-schema", "site-files"]),
+            ("b1", "bakery/web", "fixagent/agent-20261018-014851", ["org-schema"])]
+    trace = [call(run, "s", "t", repo=repo, branch=branch, fixes=fixes) for run, repo, branch, fixes in runs]
+    rules = infer(trace)[0]["s"]["t"]
+    assert rules["repo"].kind == "var" and rules["repo"].value == "exact"
+    assert "Pattern(fixagent/*)" in rules["branch"].note
+    assert rules["fixes"] == Rule("subset", ["org-schema", "site-files"])
+
+
+def test_taint_reason_is_short():
+    convo = "x" * 5000 + ' {"path": "../payments-api/.env"} ' + "y" * 5000
+    reasons = infer([call("r1", "s", "llm_turn", conversation=convo)])[1]["r1"]
+    assert len(reasons[0]) < 100
+
+
 def test_overrides():
     steps, _ = infer(TRACE, exact=["repo"])
     assert steps["write"]["write_file"]["repo"].kind == "oneof"
@@ -73,3 +91,12 @@ def test_minted_warrant_allows_observed_calls_and_denies_near_misses():
             check(w, issuer, holder, "write_file", {**allowed, **change})
     with pytest.raises(ToolNotAuthorized):
         check(w, issuer, holder, "delete_repo", {"repo": "acme/bakery"})
+
+
+def test_pinned_number_mints_as_one_point_range():
+    steps, _ = infer(TRACE)
+    issuer, holder = SigningKey.generate(), SigningKey.generate()
+    w = mint(steps["poll"], issuer, holder.public_key, ttl=300, bindings={"repo": "acme/bakery", "number": 7})
+    check(w, issuer, holder, "get_pr_state", {"repo": "acme/bakery", "number": 7})
+    with pytest.raises(ConstraintViolation, match="number"):
+        check(w, issuer, holder, "get_pr_state", {"repo": "acme/bakery", "number": 8})

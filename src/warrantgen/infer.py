@@ -12,7 +12,7 @@ from pathlib import Path
 # Values that should never be learned as normal behavior: secrets, parent paths, private hosts.
 # Modeled on seo-agent's SECRET/PARENT rules in phases.py.
 SUSPICIOUS = re.compile(
-    r"(?i)(^|/)(\.env[^/]*|\.ssh|\.git/config|id_(rsa|ed25519)[^/]*|[^/]*\.(pem|key))($|/)"
+    r"""(?i)(^|/)(\.env[^/\s"']*|\.ssh|\.git/config|id_(rsa|ed25519)[^/\s"']*|[^/\s"']*\.(pem|key))($|/|\s|["'])"""
     r"|(^|/)\.\.(/|$)"
     r"|\b(127\.0\.0\.1|localhost|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|169\.254\.169\.254)\b"
 )
@@ -22,7 +22,7 @@ MIN_PREFIX = 3
 
 @dataclass(frozen=True)
 class Rule:
-    """How one argument is constrained. kind: exact, var, oneof, range, pattern, subpath, wildcard.
+    """How one argument is constrained. kind: exact, var, oneof, subset, range, pattern, subpath, wildcard.
 
     var: the value is fixed within a run but differs between runs, so it becomes a mint-time
     parameter. `value` then says whether that parameter is one value ("exact") or a list ("oneof").
@@ -42,7 +42,8 @@ def tainted_runs(records):
     for r in records:
         for v in r["args"].values():
             if isinstance(v, str) and SUSPICIOUS.search(v):
-                found.setdefault(r["run"], []).append(f'{r["tool"]}: {v}')
+                hit = SUSPICIOUS.search(v)
+                found.setdefault(r["run"], []).append(f'{r["tool"]}: ...{v[max(0, hit.start() - 30):hit.end() + 30]}...')
     return found
 
 
@@ -74,25 +75,36 @@ def _rule(arg, by_run, force_var, force_exact):
 
     if any(isinstance(v, str) and (len(v) > FREE_TEXT_LEN or re.search(r"\s", v)) for v in values):
         return Rule("wildcard", note="free text: confirm it does not change what the tool does")
+    if all(isinstance(v, list) and all(isinstance(i, (str, int)) for i in v) for v in values):
+        return Rule("subset", sorted({i for v in values for i in v}, key=str))
     if force_exact or (len(distinct) == 1 and not force_var):
         if len(distinct) > 1:
             return Rule("oneof", sorted(distinct, key=str), note="forced exact but several values seen")
         return Rule("exact", values[0], note=_single_run_note(by_run))
-    # No value repeats across runs: a per-run parameter (repo, PR number, this run's file list).
-    per_run_value = len(by_run) > 1 and _disjoint(per_run) and (one_per_run or not numeric)
+    # One value per run (repo, base branch, PR number), or a list no other run shares: a per-run parameter.
+    per_run_value = len(by_run) > 1 and (one_per_run or (_disjoint(per_run) and not numeric))
     if force_var or per_run_value:
-        prefix = os.path.commonprefix(values) if all(isinstance(v, str) for v in values) else ""
-        note = f"differs per run; or Pattern({prefix}*) if unknown at mint time" if len(prefix) >= MIN_PREFIX else "differs per run"
+        prefix = _prefix(values)
+        note = f"differs per run; or Pattern({prefix}*) if unknown at mint time" if prefix else "differs per run"
         return Rule("var", "exact" if one_per_run else "oneof", note=note)
     if numeric:
         return Rule("range", (min(values), max(values)), note="observed bounds; choose headroom")
     if all(isinstance(v, str) for v in values):
         if all(v.startswith("/") for v in values):
             return Rule("subpath", os.path.commonpath(values))
-        prefix = os.path.commonprefix(values)
-        if len(prefix) >= MIN_PREFIX:
+        prefix = _prefix(values)
+        if prefix:
             return Rule("pattern", prefix + "*")
     return Rule("oneof", sorted(distinct, key=str))
+
+
+def _prefix(values):
+    """Shared prefix cut back to its last '/', so 'fixagent/agent-2026...' generalizes to 'fixagent/'."""
+    if not all(isinstance(v, str) for v in values):
+        return ""
+    prefix = os.path.commonprefix(values)
+    prefix = prefix[: prefix.rfind("/") + 1]
+    return prefix if len(prefix) >= MIN_PREFIX else ""
 
 
 def _key(v):
