@@ -56,8 +56,8 @@ flowchart TD
     R --> T["team<br/>search · fetch"]
     T --> S["team/researcher<br/>search · fetch under docs.python.org/3/library/"]
     R --> W["writer<br/>write_file: this run's report only"]
-    S -. "write_file: denied" .-x W
-    W -. "fetch: denied" .-x S
+    S -.-x SD["write_file: denied"]
+    W -.-x WD["fetch: denied"]
 ```
 
 Tested under real `TenuoTool` enforcement with full chains: each sub-agent runs its recorded calls, and none can use a
