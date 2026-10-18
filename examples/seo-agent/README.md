@@ -2,6 +2,8 @@
 
 Traces from 15 runs of seo-agent's `FixRunWorkflow` (3 sites x 5 agent routes) on a real local Temporal server
 with Tenuo's plugin checking every activity. GitHub and the model are scripted; no network.
+The recorded `llm_turn` conversations are replaced with a placeholder: they held the agent's private system
+prompt. The argument is free text (`Wildcard`), so every result below is unchanged.
 
 - `record_runs.py`: copy into seo-agent's `tests/` and run `uv run python tests/record_runs.py traces.jsonl`.
 - `evaluate.py`: leave-one-run-out replay through Tenuo's authorizer.
