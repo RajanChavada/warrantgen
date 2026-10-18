@@ -4,6 +4,7 @@ A trace is JSON lines, one tool call each: {"run": ..., "step": ..., "tool": ...
 `step` is whatever groups calls under one warrant (a Temporal phase, a LangGraph node).
 """
 import json
+import math
 import os
 import re
 from dataclasses import dataclass
@@ -20,6 +21,8 @@ FREE_TEXT_LEN = 80  # longer strings, or any with whitespace, are free text: ide
 MIN_PREFIX = 3
 READ_VERBS = ("read", "list", "get", "fetch", "search", "view")
 PATH_ARGS = ("path", "dir", "file", "folder")
+# Money-like arguments get no headroom: extra room on an amount is real exposure.
+MONEY = re.compile(r"(?i)amount|price|cost|cents|fee|total|balance|payment|charge|refund|budget")
 
 
 @dataclass(frozen=True)
@@ -50,10 +53,12 @@ def tainted_runs(records):
     return found
 
 
-def infer(records, *, variables=(), exact=()):
+def infer(records, *, variables=(), exact=(), headroom=1.0):
     """Return ({step: {tool: {arg: Rule}}}, {excluded_run: [reasons]}).
 
     `variables` forces an argument to be a mint-time parameter; `exact` forces a fixed value.
+    `headroom` scales a numeric range's observed max before rounding it up to 1, 2 or 5 x 10^n;
+    None keeps the observed bounds. Money-like arguments always keep them.
     """
     excluded = tainted_runs(records)
     calls = {}  # (step, tool, arg) -> {run: [values]}
@@ -64,11 +69,11 @@ def infer(records, *, variables=(), exact=()):
             calls.setdefault((r["step"], r["tool"], arg), {}).setdefault(r["run"], []).append(value)
     steps = {}
     for (step, tool, arg), by_run in calls.items():
-        steps.setdefault(step, {}).setdefault(tool, {})[arg] = _rule(tool, arg, by_run, arg in variables, arg in exact)
+        steps.setdefault(step, {}).setdefault(tool, {})[arg] = _rule(tool, arg, by_run, arg in variables, arg in exact, headroom)
     return steps, excluded
 
 
-def _rule(tool, arg, by_run, force_var, force_exact):
+def _rule(tool, arg, by_run, force_var, force_exact, headroom):
     values = [v for vs in by_run.values() for v in vs]
     distinct = set(map(_key, values))
     per_run = [set(map(_key, vs)) for vs in by_run.values()]
@@ -98,7 +103,7 @@ def _rule(tool, arg, by_run, force_var, force_exact):
         note = f"differs per run; or Pattern({prefix}*) if unknown at mint time" if prefix else "differs per run"
         return Rule("var", "exact" if one_per_run else "oneof", note=note)
     if numeric:
-        return Rule("range", (min(values), max(values)), note="observed bounds; choose headroom")
+        return _range(arg, min(values), max(values), headroom)
     if all(isinstance(v, str) for v in values):
         if all(v.startswith("/") for v in values):
             return Rule("subpath", os.path.commonpath(values))
@@ -106,6 +111,27 @@ def _rule(tool, arg, by_run, force_var, force_exact):
         if prefix:
             return Rule("pattern", prefix + "*")
     return Rule("oneof", sorted(distinct, key=str))
+
+
+def _range(arg, low, high, headroom):
+    observed = f"observed {low}..{high}"
+    if headroom is None:
+        return Rule("range", (low, high), note=observed)
+    if MONEY.search(arg):
+        return Rule("range", (low, high), note=observed + "; money-like, so no headroom")
+    if high <= 0:
+        return Rule("range", (low, high), note=observed + "; no headroom below zero")
+    ceiling = _round_up(high * headroom)
+    floor = 0 if low >= 0 else low
+    return Rule("range", (floor, ceiling), note=f"{observed}; proposed {floor}..{ceiling} with headroom")
+
+
+def _round_up(x):
+    """Smallest of 1, 2, 5 x 10^n that is at least x: 503 -> 1000, 5100 -> 10000."""
+    scale = 10 ** math.floor(math.log10(x))
+    step = next(m for m in (1, 2, 5, 10) if m * scale >= x)
+    value = step * scale
+    return int(value) if value == int(value) else value
 
 
 def _prefix(values):

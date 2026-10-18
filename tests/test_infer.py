@@ -33,7 +33,7 @@ def test_write_phase_matches_hand_written_shape():
     assert excluded == {}
     assert w["repo"].kind == "var" and w["repo"].value == "exact"  # phases.py: Exact(repo)
     assert w["path"] == Rule("var", "oneof", w["path"].note)       # phases.py: OneOf(paths)
-    assert w["size"].kind == "range" and w["size"].value == (812, 5100)  # phases.py: Range(max=20000)
+    assert w["size"].value == (0, 10000) and "observed 812..5100" in w["size"].note  # phases.py: Range(max=20000)
     assert w["text"].kind == "wildcard"                             # phases.py: Wildcard()
     assert w["branch"].kind == "var" and "fixagent/*" in w["branch"].note  # phases.py: Pattern("fixagent/*")
     assert steps["write"]["open_pr"]["base"] == Rule("exact", "main")
@@ -113,7 +113,7 @@ def test_minted_warrant_allows_observed_calls_and_denies_near_misses():
     for r in TRACE[:3]:
         check(w, issuer, holder, r["tool"], r["args"])
     allowed = TRACE[0]["args"]
-    for change in ({"repo": "acme/dentist"}, {"path": "public/.env"}, {"size": 5101}, {"branch": "main"}):
+    for change in ({"repo": "acme/dentist"}, {"path": "public/.env"}, {"size": 10001}, {"branch": "main"}):
         with pytest.raises(ConstraintViolation, match=next(iter(change))):
             check(w, issuer, holder, "write_file", {**allowed, **change})
     with pytest.raises(ToolNotAuthorized):
@@ -127,3 +127,14 @@ def test_pinned_number_mints_as_one_point_range():
     check(w, issuer, holder, "get_pr_state", {"repo": "acme/bakery", "number": 7})
     with pytest.raises(ConstraintViolation, match="number"):
         check(w, issuer, holder, "get_pr_state", {"repo": "acme/bakery", "number": 8})
+
+
+def test_headroom_rounds_up_unless_money_or_disabled():
+    trace = [call("r1", "s", "t", size=812, amount_cents=12000, ratio=0.37), call("r1", "s", "t", size=5100,
+                                                                              amount_cents=300, ratio=0.12)]
+    rules = infer(trace)[0]["s"]["t"]
+    assert rules["size"].value == (0, 10000) and "observed 812..5100" in rules["size"].note
+    assert rules["amount_cents"].value == (300, 12000) and "money-like" in rules["amount_cents"].note
+    assert rules["ratio"].value == (0, 0.5)
+    assert infer(trace, headroom=2)[0]["s"]["t"]["size"].value == (0, 20000)
+    assert infer(trace, headroom=None)[0]["s"]["t"]["size"].value == (812, 5100)
