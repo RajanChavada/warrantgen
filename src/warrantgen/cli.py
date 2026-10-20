@@ -7,6 +7,7 @@ from pathlib import Path
 from warrantgen.chain import hop_rules, hop_values, mint_chains
 from warrantgen.emit import Unsupported, dump, template
 from warrantgen.infer import bound_only, infer, load_trace, run_values
+from warrantgen.reconcile import load_draft, reconcile
 from warrantgen.testgen import render_tests
 
 
@@ -16,6 +17,7 @@ def main(argv=None):
     for name, help_text in (("infer", "show the rules inferred for each step"),
                             ("template", "write one step as a tenuo-cli template (version 2)"),
                             ("chain", "show the per-hop delegation tree and check each hop narrows"),
+                            ("reconcile", "compare a draft template with the runs: tighten, exceeds, untested"),
                             ("test", "write pytest tests: recorded calls allowed, near-misses denied")):
         sub = commands.add_parser(name, help=help_text)
         sub.add_argument("traces", nargs="+", help="trace files (JSON lines)")
@@ -29,6 +31,10 @@ def main(argv=None):
                                           help="test your own warrants: (step, values, issuer, holder_public_key)")
     commands.choices["test"].add_argument("--known-looser", action="append", default=[], metavar="ARG",
                                           help="an argument your warrants loosen on purpose (strict xfail)")
+    rec = commands.choices["reconcile"]
+    rec.add_argument("--draft", required=True, help="the draft warrant, as a tenuo-cli template (version 2)")
+    rec.add_argument("--step", required=True, help="step name, or a unique prefix of it")
+    rec.add_argument("--out", help="write the proposed template here")
     tpl = commands.choices["template"]
     tpl.add_argument("--step", required=True, help="step name, or a unique prefix of it")
     tpl.add_argument("--from-run", help="fill per-run values from this recorded run")
@@ -45,6 +51,8 @@ def main(argv=None):
         return _show(steps, excluded, args.json)
     if args.command == "chain":
         return _chain(records, args, excluded)
+    if args.command == "reconcile":
+        return _reconcile(steps, records, excluded, args)
     if args.command == "test":
         text = render_tests(steps, [r for r in records if r["run"] not in excluded], source=", ".join(args.traces),
                             warrant_for=args.warrant_for, known_looser=args.known_looser)
@@ -105,12 +113,35 @@ def _chain(records, args, excluded):
     return 0
 
 
-def _template(steps, records, args):
-    matches = [s for s in steps if s == args.step] or [s for s in steps if s.startswith(args.step)]
+def _step(steps, wanted):
+    matches = [s for s in steps if s == wanted] or [s for s in steps if s.startswith(wanted)]
     if len(matches) != 1:
-        print(f"--step {args.step!r} matches {len(matches)} steps: {', '.join(steps)}", file=sys.stderr)
+        print(f"--step {wanted!r} matches {len(matches)} steps: {', '.join(steps)}", file=sys.stderr)
+        return None
+    return matches[0]
+
+
+def _reconcile(steps, records, excluded, args):
+    step = _step(steps, args.step)
+    if step is None:
         return 2
-    step = matches[0]
+    calls = [r for r in records if r["step"] == step and r["run"] not in excluded]
+    proposal, findings = reconcile(load_draft(args.draft), steps[step], calls)
+    print(f"step {step}: {len({c['run'] for c in calls})} runs, {len(calls)} calls")
+    for f in findings:
+        change = f"{f.draft!r} -> {f.proposed!r}" if f.kind == "tighten" else ""
+        print(f"  {f.kind:9} {f.tool + ('.' + f.arg if f.arg else ''):28} {change:36} {f.note}".rstrip())
+    for run, reasons in excluded.items():
+        print(f"quarantined run {run}: {'; '.join(reasons)}")
+    if args.out:
+        Path(args.out).write_text(dump(proposal))
+    return 1 if any(f.kind == "exceeds" for f in findings) else 0
+
+
+def _template(steps, records, args):
+    step = _step(steps, args.step)
+    if step is None:
+        return 2
     rules = steps[step]
     values = {}
     if args.from_run:
