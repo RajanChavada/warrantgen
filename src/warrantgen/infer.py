@@ -41,7 +41,21 @@ class Rule:
 
 
 def load_trace(path):
-    return [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
+    """Trace rows from a warrantgen trace, or from Tenuo audit events (the log `tenuo discover` reads)."""
+    rows = []
+    for line in Path(path).read_text().splitlines():
+        if not line.startswith("{"):
+            continue  # audit events go to stdout, between the app's own output
+        row = json.loads(line)
+        if "event_type" in row:
+            if not row["event_type"].startswith("authorization_"):
+                continue
+            # An audit event has no run or step: one run per file (or trace_id), and one step, like discover.
+            row = {"run": row.get("trace_id") or str(path), "step": "audit", "tool": row["tool"],
+                   "args": row.get("constraints") or {},
+                   "decision": "DENY" if row["event_type"] == "authorization_failure" else "ALLOW"}
+        rows.append(row)
+    return rows
 
 
 def tainted_runs(records):
