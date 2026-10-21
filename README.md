@@ -106,6 +106,14 @@ warrantgen chain traces.jsonl --from-run RUN           # per-hop tree, minted an
 warrantgen test traces.jsonl --out test_warrants.py    # recorded calls allowed, near-misses denied
 ```
 
+A scheduled job reuses one warrant for every run, so it can't bind one run's values. `--standing` writes rules
+that cover every run seen instead: files under their common folder, values from a fixed list or prefix, numbers in
+a range. Give it a TTL that covers the schedule:
+
+```bash
+warrantgen template traces.jsonl --step nightly --standing --ttl 7d --out nightly.yaml
+```
+
 In Python: `warrantgen.infer`, `warrantgen.mint`, `warrantgen.chain.mint_chains`.
 
 ### Test the warrants you ship

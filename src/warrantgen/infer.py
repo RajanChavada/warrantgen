@@ -170,6 +170,44 @@ def _single_run_note(by_run):
     return "seen in one run only: may be a per-run value (use --var)" if len(by_run) == 1 else ""
 
 
+def standing(step_rules, step_calls, *, headroom=1.0):
+    """Rules for a warrant reused across runs (a scheduled job): each per-run argument covers every run seen.
+
+    Absolute paths become their common folder, other strings their shared prefix or the values seen,
+    numbers a range, lists a subset. Nothing is bound to one run, so no --from-run or --set is needed.
+    """
+    out = {}
+    for tool, args in step_rules.items():
+        out[tool] = {}
+        for arg, rule in args.items():
+            if rule.kind != "var":
+                out[tool][arg] = rule
+                continue
+            seen = [c["args"][arg] for c in step_calls if c["tool"] == tool and arg in c["args"]]
+            out[tool][arg] = _covering(arg, seen, rule, headroom)
+    return out
+
+
+def _covering(arg, seen, rule, headroom):
+    note = "covers every run seen"
+    if rule.value == "under":
+        return Rule("under", sorted({v.split("/")[0] for v in seen if isinstance(v, str)}), note=note)
+    flat = [i for v in seen for i in (v if isinstance(v, list) else [v])]
+    if seen and all(isinstance(v, list) for v in seen):
+        return Rule("subset", sorted(set(flat), key=str), note=note)
+    if flat and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in flat):
+        return _range(arg, min(flat), max(flat), headroom)
+    if flat and all(isinstance(v, str) for v in flat):
+        if all(v.startswith("/") for v in flat):
+            folder = os.path.commonpath(flat) if len(set(flat)) > 1 else os.path.dirname(flat[0])
+            if folder.count("/") >= 2:
+                return Rule("subpath", folder, note=f"{note}: files under {folder}")
+        prefix = _prefix(flat)
+        if prefix:
+            return Rule("pattern", prefix + "*", note=f"{note}: values starting {prefix}")
+    return Rule("oneof", sorted(set(flat), key=str), note=f"{note}: only these values")
+
+
 def run_values(step_rules, step_calls, run_calls):
     """Values for per-run arguments: from this step's calls, else anywhere in the run (the minter's context)."""
     out = {}
