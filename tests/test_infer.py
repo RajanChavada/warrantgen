@@ -138,3 +138,18 @@ def test_headroom_rounds_up_unless_money_or_disabled():
     assert rules["ratio"].value == (0, 0.5)
     assert infer(trace, headroom=2)[0]["s"]["t"]["size"].value == (0, 20000)
     assert infer(trace, headroom=None)[0]["s"]["t"]["size"].value == (812, 5100)
+
+
+def test_long_absolute_paths_are_paths_not_free_text():
+    base = "/home/someone/projects/company-monorepo/services/reporting/data/quarterly/reports"
+    assert len(base) > 80
+    steps, _ = infer([call("r1", "s", "read_file", path=f"{base}/q1.csv"),
+                      call("r2", "s", "read_file", path=f"{base}/q2.csv")])
+    rule = steps["s"]["read_file"]["path"]
+    assert rule.kind == "var" and f"Pattern({base}/*)" in rule.note
+
+
+def test_long_text_without_a_slash_is_still_free_text():
+    token = "x" * 120
+    steps, _ = infer([call("r1", "s", "note", text=token), call("r2", "s", "note", text=token + "y")])
+    assert steps["s"]["note"]["text"].kind == "wildcard"

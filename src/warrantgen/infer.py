@@ -17,7 +17,7 @@ SUSPICIOUS = re.compile(
     r"|(^|/)\.\.(/|$)"
     r"|\b(127\.0\.0\.1|localhost|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|169\.254\.169\.254)\b"
 )
-FREE_TEXT_LEN = 80  # longer strings, or any with whitespace, are free text: identifiers rarely have spaces
+FREE_TEXT_LEN = 80  # longer strings without a "/", or any with whitespace, are free text
 MIN_PREFIX = 3
 READ_VERBS = ("read", "list", "get", "fetch", "search", "view")
 PATH_ARGS = ("path", "dir", "file", "folder")
@@ -83,7 +83,7 @@ def _rule(tool, arg, by_run, force_var, force_exact, headroom):
     numeric = all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values)
     one_per_run = all(len(s) == 1 for s in per_run)
 
-    if any(isinstance(v, str) and (len(v) > FREE_TEXT_LEN or re.search(r"\s", v)) for v in values):
+    if any(_free_text(v) for v in values):
         return Rule("wildcard", note="free text: confirm it does not change what the tool does")
     if all(isinstance(v, list) and all(isinstance(i, (str, int)) for i in v) for v in values):
         return Rule("subset", sorted({i for v in values for i in v}, key=str))
@@ -122,6 +122,11 @@ def _rule(tool, arg, by_run, force_var, force_exact, headroom):
         if prefix:
             return Rule("pattern", prefix + "*")
     return Rule("oneof", sorted(distinct, key=str))
+
+
+def _free_text(v):
+    """Prose, not an identifier: any whitespace, or long with no '/'. Long paths stay paths."""
+    return isinstance(v, str) and (re.search(r"\s", v) is not None or (len(v) > FREE_TEXT_LEN and "/" not in v))
 
 
 def _range(arg, low, high, headroom):
