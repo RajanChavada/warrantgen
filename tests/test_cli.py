@@ -56,3 +56,45 @@ def test_chain_prints_hops_and_mints_them(tmp_path, capsys):
     assert "(root): search, write_file\n  team: search\n    team/researcher: search\n  writer: write_file" in out
     assert main(["chain", str(path), "--from-run", "r1"]) == 0
     assert "minted 4 hops" in capsys.readouterr().out
+
+
+NIGHTLY = [
+    {"run": f"r{n}", "step": "nightly", "tool": tool, "args": args}
+    for n, quarter in ((1, "q2"), (2, "q3"), (3, "q2"))
+    for tool, args in (
+        ("read_file", {"path": f"/data/reports/{quarter}.csv"}),
+        ("write_file", {"path": f"/data/out/r{n}.md", "content": f"# {quarter} summary\n"}),
+        ("send_digest", {"channel": f"ops-{quarter}", "rows": 10 * n}),
+    )
+]
+
+
+def test_standing_template_covers_every_run_of_a_scheduled_job(tmp_path, capsys):
+    path = tmp_path / "t.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in NIGHTLY))
+    assert main(["template", str(path), "--step", "nightly", "--standing", "--ttl", "7d"]) == 0
+    doc = yaml.safe_load(capsys.readouterr().out)
+    assert doc["ttl"] == "7d"
+    assert doc["capabilities"] == {
+        "read_file": {"path": {"subpath": "/data/reports"}},
+        "write_file": {"path": {"subpath": "/data/out"}, "content": "any"},
+        "send_digest": {"channel": {"pattern": "ops-*"}, "rows": "0..50"},
+    }
+
+
+def test_standing_refuses_run_bindings_and_reminds_about_ttl(tmp_path, capsys):
+    path = tmp_path / "t.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in NIGHTLY))
+    assert main(["template", str(path), "--step", "nightly", "--standing", "--from-run", "r1"]) == 2
+    assert main(["template", str(path), "--step", "nightly", "--standing"]) == 0
+    assert "--ttl" in capsys.readouterr().err
+
+
+def test_standing_generalizes_ticket_ids_to_their_stable_prefix(tmp_path, capsys):
+    calls = [{"run": f"d{n}", "step": "s", "tool": "get_ticket", "args": {"key": f"HELP-10{n}", "queue": "it"}}
+             for n in range(1, 4)]
+    path = tmp_path / "t.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in calls))
+    assert main(["template", str(path), "--step", "s", "--standing", "--ttl", "1d"]) == 0
+    caps = yaml.safe_load(capsys.readouterr().out)["capabilities"]
+    assert caps == {"get_ticket": {"key": {"pattern": "HELP-*"}, "queue": "it"}}

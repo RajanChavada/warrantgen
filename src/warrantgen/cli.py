@@ -6,7 +6,7 @@ from pathlib import Path
 
 from warrantgen.chain import hop_rules, hop_values, mint_chains
 from warrantgen.emit import Unsupported, dump, template
-from warrantgen.infer import bound_only, infer, load_trace, run_values
+from warrantgen.infer import bound_only, infer, load_trace, run_values, standing, tainted_runs
 from warrantgen.testgen import render_tests
 
 
@@ -32,6 +32,8 @@ def main(argv=None):
     tpl = commands.choices["template"]
     tpl.add_argument("--step", required=True, help="step name, or a unique prefix of it")
     tpl.add_argument("--from-run", help="fill per-run values from this recorded run")
+    tpl.add_argument("--standing", action="store_true",
+                     help="one warrant for every run (a scheduled job): per-run values cover all runs seen")
     tpl.add_argument("--set", action="append", default=[], metavar="NAME=VALUE",
                      help="per-run value; commas make a list (repeatable)")
     tpl.add_argument("--ttl", default="5m")
@@ -113,6 +115,16 @@ def _template(steps, records, args):
     step = matches[0]
     rules = steps[step]
     values = {}
+    if args.standing:
+        if args.from_run or args.set:
+            print("--standing covers every run; drop --from-run and --set", file=sys.stderr)
+            return 2
+        excluded = tainted_runs(records)
+        rules = standing(rules, [r for r in records if r["step"] == step and r["run"] not in excluded],
+                         headroom=None if args.headroom == "none" else float(args.headroom))
+        if args.ttl == "5m":
+            print("note: a standing warrant is reused across runs; set --ttl to cover the schedule (e.g. 7d)",
+                  file=sys.stderr)
     if args.from_run:
         run = [r for r in records if r["run"] == args.from_run]
         if not run:
