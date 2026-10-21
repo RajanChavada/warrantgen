@@ -107,7 +107,7 @@ warrantgen test traces.jsonl --out test_warrants.py    # recorded calls allowed,
 ```
 
 A scheduled job reuses one warrant for every run, so it can't bind one run's values. `--standing` writes rules
-that cover every run seen instead: files under their common folder, values from a fixed list or prefix, numbers in
+that cover every run seen instead: files under their common folder, IDs under their stable prefix (`HELP-*`), other values from a fixed list, numbers in
 a range. Give it a TTL that covers the schedule:
 
 ```bash

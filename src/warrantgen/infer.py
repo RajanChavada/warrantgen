@@ -202,10 +202,24 @@ def _covering(arg, seen, rule, headroom):
             folder = os.path.commonpath(flat) if len(set(flat)) > 1 else os.path.dirname(flat[0])
             if folder.count("/") >= 2:
                 return Rule("subpath", folder, note=f"{note}: files under {folder}")
-        prefix = _prefix(flat)
+        prefix = _prefix(flat) or _id_prefix(flat)
         if prefix:
             return Rule("pattern", prefix + "*", note=f"{note}: values starting {prefix}")
     return Rule("oneof", sorted(set(flat), key=str), note=f"{note}: only these values")
+
+
+def _id_prefix(values):
+    """The stable part of identifiers like HELP-101 or cron_nightly_0201: the prefix up to its last separator.
+
+    Only for --standing, where tomorrow's run will use an ID nobody has seen yet. One distinct value,
+    or values with no shared separator-delimited prefix, give no pattern.
+    """
+    if len(set(values)) < 2:
+        return ""
+    prefix = os.path.commonprefix(values)
+    cut = max(prefix.rfind(sep) for sep in "-_.:")
+    prefix = prefix[: cut + 1]
+    return prefix if len(prefix) >= MIN_PREFIX else ""
 
 
 def run_values(step_rules, step_calls, run_calls):

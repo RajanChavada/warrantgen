@@ -78,7 +78,7 @@ def test_standing_template_covers_every_run_of_a_scheduled_job(tmp_path, capsys)
     assert doc["capabilities"] == {
         "read_file": {"path": {"subpath": "/data/reports"}},
         "write_file": {"path": {"subpath": "/data/out"}, "content": "any"},
-        "send_digest": {"channel": ["ops-q2", "ops-q3"], "rows": "0..50"},
+        "send_digest": {"channel": {"pattern": "ops-*"}, "rows": "0..50"},
     }
 
 
@@ -88,3 +88,13 @@ def test_standing_refuses_run_bindings_and_reminds_about_ttl(tmp_path, capsys):
     assert main(["template", str(path), "--step", "nightly", "--standing", "--from-run", "r1"]) == 2
     assert main(["template", str(path), "--step", "nightly", "--standing"]) == 0
     assert "--ttl" in capsys.readouterr().err
+
+
+def test_standing_generalizes_ticket_ids_to_their_stable_prefix(tmp_path, capsys):
+    calls = [{"run": f"d{n}", "step": "s", "tool": "get_ticket", "args": {"key": f"HELP-10{n}", "queue": "it"}}
+             for n in range(1, 4)]
+    path = tmp_path / "t.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in calls))
+    assert main(["template", str(path), "--step", "s", "--standing", "--ttl", "1d"]) == 0
+    caps = yaml.safe_load(capsys.readouterr().out)["capabilities"]
+    assert caps == {"get_ticket": {"key": {"pattern": "HELP-*"}, "queue": "it"}}
