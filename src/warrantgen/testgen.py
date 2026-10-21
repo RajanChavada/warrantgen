@@ -6,7 +6,7 @@ them at your own minting code so they test the warrants you ship.
 """
 import pprint
 
-from warrantgen.infer import bound_only, run_values
+from warrantgen.infer import bound, bound_only, run_values
 
 SHORT = 60  # wildcard values longer than this are shortened: the rule allows any value, so the test needn't carry it
 
@@ -41,7 +41,7 @@ def _cases(rules, records, step):
         first.setdefault(tool, args)
     for tool, args in first.items():
         for arg, rule in rules[tool].items():
-            for value, why in _near_misses(rule, values.get(arg), args.get(arg)):
+            for value, why in _near_misses(rule, bound(values, tool, arg), args.get(arg)):
                 denied.append((tool, {**args, arg: value}, f"{arg}: {why}"))
     tool, args = next(iter(first.items()))
     denied.append((f"not_{tool}", args, "a tool this step never used"))

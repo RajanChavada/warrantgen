@@ -7,6 +7,8 @@ import re
 
 import yaml
 
+from warrantgen.infer import bound
+
 _RANGE_LIKE = re.compile(r"-?[\d.]*\.\.-?[\d.]*")
 
 
@@ -24,7 +26,7 @@ def template(step_rules, *, name, ttl="5m", bindings=None):
         capabilities[tool] = {}
         for arg, rule in args.items():
             try:
-                capabilities[tool][arg] = _value(rule, bindings.get(arg))
+                capabilities[tool][arg] = _value(rule, bound(bindings, tool, arg))
             except ValueError as e:
                 gaps.append(f"{tool}.{arg}: {e}")
     if gaps:

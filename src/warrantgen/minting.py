@@ -3,6 +3,8 @@ import re
 
 from tenuo import All, AnyOf, Exact, Not, OneOf, Pattern, Range, Regex, Subpath, Subset, UrlPattern, Warrant, Wildcard
 
+from warrantgen.infer import bound
+
 # Same shape as seo-agent's readable(): under the folders, never a secret file, never `..`.
 SECRET = (r"(?i)(^|/)(\.env[^/]*|\.git|\.ssh|secrets?|credentials?|[^/]*(secret|credential|private)[^/]*|"
           r"id_(rsa|dsa|ecdsa|ed25519)[^/]*|\.npmrc|\.netrc|\.pypirc|[^/]*\.(pem|key|p12|pfx))(/|$)")
@@ -64,5 +66,5 @@ def mint(step_rules, issuer, holder_public_key, *, ttl, bindings=None):
     bindings = bindings or {}
     builder = Warrant.mint_builder()
     for tool, args in step_rules.items():
-        builder = builder.capability(tool, **{a: constraint(r, bindings.get(a)) for a, r in args.items()})
+        builder = builder.capability(tool, **{a: constraint(r, bound(bindings, tool, a)) for a, r in args.items()})
     return builder.holder(holder_public_key).ttl(ttl).mint(issuer)
