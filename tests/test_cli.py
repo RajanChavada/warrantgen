@@ -56,3 +56,24 @@ def test_chain_prints_hops_and_mints_them(tmp_path, capsys):
     assert "(root): search, write_file\n  team: search\n    team/researcher: search\n  writer: write_file" in out
     assert main(["chain", str(path), "--from-run", "r1"]) == 0
     assert "minted 4 hops" in capsys.readouterr().out
+
+
+SHARED = [
+    {"run": "r1", "step": "nightly", "tool": "read_file", "args": {"path": "/data/reports/q2.csv"}},
+    {"run": "r1", "step": "nightly", "tool": "write_file", "args": {"path": "/data/out/r1.md"}},
+    {"run": "r2", "step": "nightly", "tool": "read_file", "args": {"path": "/data/reports/q3.csv"}},
+    {"run": "r2", "step": "nightly", "tool": "write_file", "args": {"path": "/data/out/r2.md"}},
+]
+
+
+def test_tools_sharing_an_argument_name_keep_their_own_run_values(tmp_path, capsys):
+    path = tmp_path / "t.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in SHARED))
+    assert main(["template", str(path), "--step", "nightly", "--from-run", "r2"]) == 0
+    caps = yaml.safe_load(capsys.readouterr().out)["capabilities"]
+    assert caps == {"read_file": {"path": "/data/reports/q3.csv"}, "write_file": {"path": "/data/out/r2.md"}}
+    # --set NAME still applies to every tool with that argument; TOOL.NAME to one.
+    assert main(["template", str(path), "--step", "nightly", "--set", "path=/data/x",
+                 "--set", "write_file.path=/data/out/x.md"]) == 0
+    caps = yaml.safe_load(capsys.readouterr().out)["capabilities"]
+    assert caps == {"read_file": {"path": "/data/x"}, "write_file": {"path": "/data/out/x.md"}}

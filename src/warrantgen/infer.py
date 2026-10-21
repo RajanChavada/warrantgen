@@ -171,18 +171,38 @@ def _single_run_note(by_run):
 
 
 def run_values(step_rules, step_calls, run_calls):
-    """Values for per-run arguments: from this step's calls, else anywhere in the run (the minter's context)."""
+    """Values for per-run arguments, keyed "tool.arg".
+
+    Taken from this tool's calls in the step, else in the run, else from any call carrying the argument
+    (the minter's context). Two tools that share an argument name keep their own values.
+    """
     out = {}
-    for args in step_rules.values():
+    for tool, args in step_rules.items():
         for arg, rule in args.items():
             if rule.kind == "var":
-                seen = [c["args"][arg] for c in step_calls if arg in c["args"]] or [
-                    c["args"][arg] for c in run_calls if arg in c["args"]]
+                seen = next((found for found in (
+                    [c["args"][arg] for c in step_calls if c["tool"] == tool and arg in c["args"]],
+                    [c["args"][arg] for c in run_calls if c["tool"] == tool and arg in c["args"]],
+                    [c["args"][arg] for c in step_calls if arg in c["args"]],
+                    [c["args"][arg] for c in run_calls if arg in c["args"]],
+                ) if found), [])
                 if seen:
-                    out[arg] = seen[0] if rule.value == "exact" else sorted(set(seen))
+                    out[f"{tool}.{arg}"] = seen[0] if rule.value == "exact" else sorted(set(seen), key=str)
     return out
+
+
+def bound(values, tool, arg):
+    """A per-run value for tool.arg: "tool.arg" if given, else a bare "arg" that applies to every tool."""
+    values = values or {}
+    return values.get(f"{tool}.{arg}", values.get(arg))
+
+
+def has_binding(values, tool, arg):
+    values = values or {}
+    return f"{tool}.{arg}" in values or arg in values
 
 
 def bound_only(step_rules, values):
     """Drop tools whose per-run arguments have no value: the run does not call them."""
-    return {t: a for t, a in step_rules.items() if all(r.kind != "var" or n in values for n, r in a.items())}
+    return {t: a for t, a in step_rules.items()
+            if all(r.kind != "var" or has_binding(values, t, n) for n, r in a.items())}

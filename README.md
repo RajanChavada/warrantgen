@@ -106,6 +106,9 @@ warrantgen chain traces.jsonl --from-run RUN           # per-hop tree, minted an
 warrantgen test traces.jsonl --out test_warrants.py    # recorded calls allowed, near-misses denied
 ```
 
+`--set NAME=VALUE` gives every tool with that argument the value; `--set TOOL.NAME=VALUE` gives it to one
+tool, so `read_file.path` and `write_file.path` can differ.
+
 In Python: `warrantgen.infer`, `warrantgen.mint`, `warrantgen.chain.mint_chains`.
 
 ### Test the warrants you ship

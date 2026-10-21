@@ -4,7 +4,7 @@ Hops come from recorded node paths: "team/researcher" sits under "team", which s
 rules are inferred from its own calls and all its descendants', so a parent always covers its children. Children are
 minted through Tenuo's delegation API, so Tenuo itself checks that every hop only narrows.
 """
-from warrantgen.infer import infer, run_values
+from warrantgen.infer import bound, infer, run_values
 from tenuo import AnyOf, UrlPattern
 
 from warrantgen.minting import constraint, mint, under
@@ -55,12 +55,14 @@ def mint_chains(hops, issuer, keys, *, ttl, values=None):
 def _narrow(parent, parent_key, child_key, parent_rules, child_rules, parent_values, child_values, ttl):
     # Start from the parent's constraints for the child's tools (a child may not drop an argument), then
     # try each narrower argument alone so one Tenuo refusal doesn't cost the others.
-    inherited = {t: {a: constraint(r, parent_values.get(a)) for a, r in parent_rules[t].items()} for t in child_rules}
+    inherited = {t: {a: constraint(r, bound(parent_values, t, a)) for a, r in parent_rules[t].items()}
+                 for t in child_rules}
     accepted, kept = {}, []
     for tool, args in child_rules.items():
         for arg, rule in args.items():
             try:
-                candidate = _candidate(parent_rules[tool][arg], parent_values.get(arg), rule, child_values.get(arg))
+                candidate = _candidate(parent_rules[tool][arg], bound(parent_values, tool, arg), rule,
+                                       bound(child_values, tool, arg))
                 _grant(parent, parent_key, child_key, _with(inherited, {(tool, arg): candidate}), ttl)
                 accepted[tool, arg] = candidate
             except Exception:

@@ -32,8 +32,8 @@ def main(argv=None):
     tpl = commands.choices["template"]
     tpl.add_argument("--step", required=True, help="step name, or a unique prefix of it")
     tpl.add_argument("--from-run", help="fill per-run values from this recorded run")
-    tpl.add_argument("--set", action="append", default=[], metavar="NAME=VALUE",
-                     help="per-run value; commas make a list (repeatable)")
+    tpl.add_argument("--set", action="append", default=[], metavar="[TOOL.]NAME=VALUE",
+                     help="per-run value for NAME in every tool, or in TOOL only; commas make a list (repeatable)")
     tpl.add_argument("--ttl", default="5m")
     tpl.add_argument("--out", help="write here instead of stdout")
     args = parser.parse_args(argv)
@@ -139,7 +139,10 @@ def _template(steps, records, args):
 
 
 def _parse_value(value, rules, name):
-    kinds = {r.value for args in rules.values() for a, r in args.items() if a == name and r.kind == "var"}
+    """NAME applies to every tool with that argument; TOOL.NAME to one tool."""
+    tool, _, arg = name.rpartition(".")
+    kinds = {r.value for t, args in rules.items() for a, r in args.items()
+             if a == arg and (not tool or t == tool) and r.kind == "var"}
     if kinds & {"oneof", "under"}:
         return value.split(",")
     return int(value) if value.isdigit() else value
