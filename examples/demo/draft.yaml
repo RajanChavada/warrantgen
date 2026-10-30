@@ -1,0 +1,13 @@
+# What a model might draft for the researcher from "research the Python docs": loosely bounded,
+# plus a tool it might need someday. `warrantgen reconcile` checks it against the recorded runs.
+version: 2
+name: researcher
+ttl: 1h
+capabilities:
+  search:
+    query: any
+    limit: 1..5
+  fetch:
+    url: any
+  delete_file:
+    path: any

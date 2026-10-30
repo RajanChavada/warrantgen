@@ -9,6 +9,9 @@ Writing least-privilege warrants by hand is the slow part of adopting Tenuo. A r
 of hand-written warrant, key and audit code. warrantgen infers the same constraints from recorded runs, and on that
 agent's held-out runs it allows every legitimate call and denies every injected secret read.
 
+Try it in five commands, no network or account: [examples/demo](examples/demo/README.md) records a small agent,
+infers its warrants, and stops a prompt injection the agent fell for.
+
 ## How it works
 
 ```mermaid

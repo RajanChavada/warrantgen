@@ -1,3 +1,7 @@
 .venv/
 __pycache__/
 *.egg-info/
+# examples/demo output when run from the repo root
+/traces/
+/proposal.yaml
+/test_warrants.py
