@@ -12,6 +12,10 @@ agent's held-out runs it allows every legitimate call and denies every injected 
 Try it in five commands, no network or account: [examples/demo](examples/demo/README.md) records a small agent,
 infers its warrants, and stops a prompt injection the agent fell for.
 
+For actions that can't be undone, [examples/refund-agent](examples/refund-agent/README.md) caps refunds to recorded
+behavior, gates each one behind a signed human approval, and runs 16 failure scenarios: injection, approval bypass,
+expired approvals, malformed arguments, timeouts.
+
 ## How it works
 
 ```mermaid
@@ -109,7 +113,8 @@ warrantgen chain traces.jsonl --from-run RUN           # per-hop tree, minted an
 warrantgen test traces.jsonl --out test_warrants.py    # recorded calls allowed, near-misses denied
 ```
 
-In Python: `warrantgen.infer`, `warrantgen.mint`, `warrantgen.chain.mint_chains`.
+In Python: `warrantgen.infer`, `warrantgen.mint`, `warrantgen.chain.mint_chains`. Pass `gates=["issue_refund"]` and
+`approvers=[key.public_key]` to `mint` to require a signed approval on every call to those tools.
 
 ### Test the warrants you ship
 

@@ -59,10 +59,16 @@ def constraint(rule, binding=None):
     raise ValueError(f"unknown rule kind {rule.kind!r}")
 
 
-def mint(step_rules, issuer, holder_public_key, *, ttl, bindings=None):
-    """Mint one step's warrant. `bindings` gives each per-run argument its value for this run."""
+def mint(step_rules, issuer, holder_public_key, *, ttl, bindings=None, gates=(), approvers=()):
+    """Mint one step's warrant. `bindings` gives each per-run argument its value for this run.
+
+    Tools in `gates` also need a signed approval from `approvers` (public keys) on every call. Tenuo checks the
+    constraints first, so an approval never widens a call; with no approvers a gated tool is always denied.
+    """
     bindings = bindings or {}
     builder = Warrant.mint_builder()
     for tool, args in step_rules.items():
         builder = builder.capability(tool, **{a: constraint(r, bindings.get(a)) for a, r in args.items()})
+    if gates:
+        builder = builder.approval_gates({tool: None for tool in gates}).required_approvers(list(approvers))
     return builder.holder(holder_public_key).ttl(ttl).mint(issuer)

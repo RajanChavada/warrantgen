@@ -62,6 +62,8 @@ that stops injected reads.
 - Free text is detected by whitespace or length. A short identifier-like free-text value would be pinned.
 - Read tools are recognized by name prefix (`read`, `list`, `get`, `fetch`, `search`, `view`); paths by argument name.
 - Folder rules take their folders from the run's own calls; a real minter takes them from run settings.
+- Approval gates are chosen by hand (`mint(gates=...)`); warrantgen doesn't infer which tools can't be undone.
+- Quarantine catches secrets, `..` and private hosts. A poisoned run that refunds $5,000 looks normal and is learned.
 - Fixed: `warrantgen.mint` was both a function and a module (renamed the module to `minting`).
 - Fixed: a parent hop fetching from several hosts used to get an exact per-run URL list its children couldn't
   narrow. It now gets `AnyOf` of one `UrlPattern` per host, and children narrow to `AnyOf([their host])`
