@@ -1,11 +1,11 @@
 [project]
 name = "warrantgen"
-version = "0.1.0"
+version = "0.1.1"
 description = "Infer least-privilege Tenuo warrants from recorded agent tool calls"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
-dependencies = ["tenuo>=0.3.2,<0.4"]
+dependencies = ["tenuo==0.3.2"]
 
 [project.urls]
 Repository = "https://github.com/RajanChavada/warrantgen"

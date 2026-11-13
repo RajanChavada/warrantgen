@@ -1131,7 +1131,7 @@ wheels = [
 
 [[package]]
 name = "warrantgen"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "tenuo" },
@@ -1154,7 +1154,7 @@ dev = [
 requires-dist = [
     { name = "langchain-core", marker = "extra == 'langchain'", specifier = ">=0.3" },
     { name = "langgraph", marker = "extra == 'langchain'", specifier = ">=0.3" },
-    { name = "tenuo", specifier = ">=0.3.2,<0.4" },
+    { name = "tenuo", specifier = "==0.3.2" },
 ]
 provides-extras = ["langchain"]
 
