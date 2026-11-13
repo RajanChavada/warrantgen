@@ -9,10 +9,10 @@ Writing least-privilege warrants by hand is the slow part of adopting Tenuo. A r
 of hand-written warrant, key and audit code. warrantgen infers the same constraints from recorded runs, and on that
 agent's held-out runs it allows every legitimate call and denies every injected secret read.
 
-Try it in five commands, no network or account: [examples/demo](examples/demo/README.md) records a small agent,
+Try it in five commands, no network or account: [examples/demo](https://github.com/RajanChavada/warrantgen/blob/main/examples/demo/README.md) records a small agent,
 infers its warrants, and stops a prompt injection the agent fell for.
 
-For actions that can't be undone, [examples/refund-agent](examples/refund-agent/README.md) caps refunds to recorded
+For actions that can't be undone, [examples/refund-agent](https://github.com/RajanChavada/warrantgen/blob/main/examples/refund-agent/README.md) caps refunds to recorded
 behavior, gates each one behind a signed human approval, and runs 16 failure scenarios: injection, approval bypass,
 expired approvals, malformed arguments, timeouts.
 
@@ -76,7 +76,7 @@ sibling's tools. If Tenuo refuses to narrow an argument, it keeps its parent's c
 
 The test agent is a Temporal workflow that opens pull requests to fix a website, minting one warrant per phase. 15
 recorded runs: 3 sites × 5 behaviors, including a prompt injection that tries to read `.env` and
-`../payments-api/.env`. Details in [examples/seo-agent](examples/seo-agent/README.md).
+`../payments-api/.env`. Details in [examples/seo-agent](https://github.com/RajanChavada/warrantgen/blob/main/examples/seo-agent/README.md).
 
 | Check | Result |
 |---|---|
@@ -146,7 +146,7 @@ Override a guess with `--var ARG` (treat as per-run) or `--exact ARG` (pin it).
 ## Status
 
 Early and opinionated. Built and tested against `tenuo==0.3.2` and the local-cli stack (tenuo#942 to #952).
-Limits and the Tenuo issues found along the way are tracked in [UPSTREAM.md](UPSTREAM.md).
+Limits and the Tenuo issues found along the way are tracked in [UPSTREAM.md](https://github.com/RajanChavada/warrantgen/blob/main/UPSTREAM.md).
 
 ## License
 
