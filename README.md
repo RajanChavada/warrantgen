@@ -88,7 +88,7 @@ recorded runs: 3 sites × 5 behaviors, including a prompt injection that tries t
 ## Quickstart
 
 ```bash
-pip install "warrantgen[langchain] @ git+https://github.com/RajanChavada/warrantgen"
+pip install "warrantgen[langchain]"
 ```
 
 Record (several runs with different inputs: one run can't tell a fixed value from a per-run one):
