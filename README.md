@@ -71,6 +71,7 @@ flowchart TD
 
 Tested under real `TenuoTool` enforcement with full chains: each sub-agent runs its recorded calls, and none can use a
 sibling's tools. If Tenuo refuses to narrow an argument, it keeps its parent's constraint and `chain` says which.
+Since tenuo 0.3.6 that includes a URL rule listing several hosts: every child keeps the parent's full host list.
 
 ## Results on a real agent
 
@@ -145,7 +146,8 @@ Override a guess with `--var ARG` (treat as per-run) or `--exact ARG` (pin it).
 
 ## Status
 
-Early and opinionated. Built and tested against `tenuo==0.3.2` and the local-cli stack (tenuo#942 to #952).
+Early and opinionated. Tested against tenuo 0.3.6 and 0.3.7 (the versions the pin allows) and the local-cli stack
+(tenuo#942 to #952).
 Limits and the Tenuo issues found along the way are tracked in [UPSTREAM.md](https://github.com/RajanChavada/warrantgen/blob/main/UPSTREAM.md).
 
 ## License

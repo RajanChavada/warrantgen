@@ -84,7 +84,9 @@ def test_folder_reads_narrow_per_hop_inside_the_parent(tmp_path):
             site.invoke({"path": path})
 
 
-def test_hosts_narrow_per_hop_inside_the_parents_any_of(tmp_path):
+def test_hosts_keep_the_parents_any_of_per_hop(tmp_path):
+    # Tenuo 0.3.6+ refuses any change to an AnyOf whose alternatives can fail (UrlPattern can), so each child keeps
+    # both hosts. If Tenuo relaxes that, this fails: narrow children to their own host again.
     rows = [{"run": run, "step": step, "tool": "fetch", "args": {"url": url}}
             for run, page in (("r1", "a"), ("r2", "b"))
             for step, url in (("a/docs", f"https://docs.python.org/3/{page}.html"),
@@ -94,11 +96,12 @@ def test_hosts_narrow_per_hop_inside_the_parents_any_of(tmp_path):
     issuer = SigningKey.generate()
     keys = {hop: SigningKey.generate() for hop in hops}
     chains, notes = mint_chains(hops, issuer, keys, ttl=300)
-    assert notes == []
+    assert notes == ["a/docs: fetch.url keeps its parent's constraint", "a/pkgs: fetch.url keeps its parent's constraint"]
     docs = TenuoTool(RAW["fetch"], bound_warrant=chains["a/docs"][-1].bind(keys["a/docs"]),
                      warrant_chain=chains["a/docs"][:-1], trusted_roots=[issuer.public_key])
-    docs.invoke({"url": "https://docs.python.org/3/library/json.html"})
-    for url in ("https://pypi.org/project/x/", "https://docs.python.org/3/../../internal", "https://evil.com/x"):
+    for url in ("https://docs.python.org/3/library/json.html", "https://pypi.org/project/x/"):
+        docs.invoke({"url": url})
+    for url in ("https://docs.python.org/3/../../internal", "https://evil.com/x"):
         with pytest.raises(ConstraintViolation):
             docs.invoke({"url": url})
 

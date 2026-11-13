@@ -25,3 +25,5 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: uv sync --locked  # fails if uv.lock is stale against pyproject.toml
       - run: uv run pytest -q
+      - name: pytest on the newest tenuo the pin allows
+        run: uv lock --upgrade-package tenuo && uv run python -c "import importlib.metadata as m; print('tenuo', m.version('tenuo'))" && uv run pytest -q

@@ -38,7 +38,8 @@ that stops injected reads.
 | S2 | Signed receipts carry tool and request hash, not arguments | `verify_receipt(...).action == "get_order"`, no args field | Drift from receipts is tool-level only; argument drift needs the plaintext trace | by design (privacy) |
 | S3 | LangChain and LangGraph have no structured observe hook; Temporal has `audit_callback` and `dry_run`. `auto_protect(mode="audit")` logs without arguments, and `TenuoTool` reports decisions only once a warrant exists | `tenuo/langchain.py` | `record_langchain.Recorder` records through LangChain callbacks instead | worked around |
 | S6 | `assert_authorized(w, key, tool, args)` called without `with` checks nothing and passes; its docstring shows that bare form | A bare call with arguments the warrant denies passed, with and without `TENUO_TEST_MODE` | Generated tests always use `with` | documented on main by [#801](https://github.com/tenuo-ai/tenuo/pull/801) (merged 2026-10-06, after 0.3.2): bare calls still check nothing, by design |
-| S7 | `tenuo.testing` detects pytest only if `"pytest"` is in `PYTEST_CURRENT_TEST` (the test's path), so tests outside such a path raise `RuntimeError` | Same test file: fails from `/private/tmp/...`, passes under `pytest-of-*` | Generated tests set `TENUO_TEST_MODE=1` | fixed on main by #801, not yet released; keep `TENUO_TEST_MODE` until warrantgen moves past 0.3.2 |
+| S7 | `tenuo.testing` detects pytest only if `"pytest"` is in `PYTEST_CURRENT_TEST` (the test's path), so tests outside such a path raise `RuntimeError` | Same test file: fails from `/private/tmp/...`, passes under `pytest-of-*` | Generated tests set `TENUO_TEST_MODE=1` | fixed by #801, released in 0.3.3; the variable is now harmless and can go |
+| S8 | Since 0.3.6, an `AnyOf` with an alternative that can fail (`UrlPattern` can) attenuates only to itself | `MonotonicityError: Any attenuation must preserve ordered alternatives that can fail` narrowing `AnyOf([docs, pypi])` to `AnyOf([docs])`; `can_fail` in `tenuo-core/src/constraints.rs` | Children of a multi-host fetch hop keep every host, and `chain` notes it | by design (short-circuit `Any` evaluation) |
 | S5 | `Pattern` on URLs matches raw text: `https://docs.python.org/3/library/../../internal` passes `Pattern(".../3/library/*")` | Allowed in a test against the real authorizer; `UrlPattern` denies it, plus `%2e%2e` and `host@evil.com` | URL rules mint `UrlPattern` | by design (docs say pattern does not normalize); worked around |
 | S4 | Approvals are reusable until they expire | `docs/local-cli.md`; d8joseph: "keeping track of use makes us stateful" | Generated warrants should pair approval gates with an idempotency key argument | by design |
 
@@ -65,9 +66,8 @@ that stops injected reads.
 - Approval gates are chosen by hand (`mint(gates=...)`); warrantgen doesn't infer which tools can't be undone.
 - Quarantine catches secrets, `..` and private hosts. A poisoned run that refunds $5,000 looks normal and is learned.
 - Fixed: `warrantgen.mint` was both a function and a module (renamed the module to `minting`).
-- Fixed: a parent hop fetching from several hosts used to get an exact per-run URL list its children couldn't
-  narrow. It now gets `AnyOf` of one `UrlPattern` per host, and children narrow to `AnyOf([their host])`
-  (Tenuo refuses `AnyOf` to a bare `UrlPattern`: "Cannot attenuate Any to UrlPattern").
+- A parent hop fetching from several hosts gets `AnyOf` of one `UrlPattern` per host. Up to tenuo 0.3.2 children
+  narrowed to `AnyOf([their host])`; since 0.3.6 they keep the parent's `AnyOf` (S8).
 - Mixed schemes (an `ftp://` URL next to `https://` ones) still give a per-run list, which children keep.
 - Tenuo narrows an `All` only by adding parts ("child All must include all parent constraints"), so a child's
   folder rule is the parent's `All` plus one more folder regex. Works, but the child's constraint grows per hop.

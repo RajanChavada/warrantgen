@@ -241,7 +241,7 @@ def scenarios(trace_dir):
         ("approval bypass", "lead's approval reused for a bigger refund", "request hash mismatch",
          lambda: call("issue_refund", {**refund, "amount_cents": high}, lambda r: signed[0])),
         ("approval bypass", "delegate the refund to another key", "ApprovalRequired",
-         lambda: call("issue_refund", refund, w=delegated, key=sub_agent, warrant_chain=[warrant, delegated])),
+         lambda: call("issue_refund", refund, w=delegated, key=sub_agent, warrant_chain=[warrant])),
         ("expired approval", "approval expired a minute ago", "approval expired",
          lambda: call("issue_refund", refund, stale)),
         ("timeout", "lead never answers", "ApprovalTimeout", lambda: call("issue_refund", refund, no_answer)),
